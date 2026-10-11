@@ -1,7 +1,11 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const runtime = "nodejs";
+
 import { NextResponse } from "next/server";
 import { PublishCommand } from "@aws-sdk/client-sns";
 import { GetCommand, BatchWriteCommand } from "@aws-sdk/lib-dynamodb";
-import { snsClient as sns, dynamoDbClient as ddb } from "@/lib/aws-config";
+import { getSnsClient, getDynamoDbClient } from "@/lib/aws-config";
 
 export async function POST(req: Request) {
   try {
@@ -14,6 +18,9 @@ export async function POST(req: Request) {
 
     const ddbTable = process.env.DDB_TABLE?.trim();
     const snsTopic = process.env.SNS_TOPIC_ARN?.trim();
+
+    const ddb = getDynamoDbClient();
+    const sns = getSnsClient();
 
     const now = Date.now();
     const getRes = await ddb.send(new GetCommand({

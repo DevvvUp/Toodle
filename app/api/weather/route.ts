@@ -1,7 +1,9 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const runtime = "nodejs";
+
 import { NextResponse } from "next/server";
 import { DELHI_NODES } from "@/lib/mock-data";
-
-export const revalidate = 300; // Next.js cache 5 mins
 
 export async function GET() {
   try {
@@ -10,18 +12,12 @@ export async function GET() {
 
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lngs}&current=temperature_2m,relative_humidity_2m,precipitation,rain,wind_speed_10m,weather_code&hourly=precipitation_probability,precipitation&timezone=Asia/Kolkata`;
 
-    const res = await fetch(url, { next: { revalidate: 300 } });
+    const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) {
       throw new Error(`Open-Meteo returned ${res.status}`);
     }
 
     const data = await res.json();
-    
-    // Open-Meteo returns array of responses when multiple coords are requested, OR single response if 1 coord.
-    // Since we request 12 coords, it returns an array in data. (Wait, open-meteo returns an array for multiple coords)
-    
-    // Double check open-meteo response structure for multiple coordinates:
-    // Actually, open-meteo returns an array of objects if multiple coords are passed.
     const responses = Array.isArray(data) ? data : [data];
 
     const parsed = DELHI_NODES.map((node, i) => {

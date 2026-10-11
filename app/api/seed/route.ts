@@ -1,10 +1,15 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const runtime = "nodejs";
+
 import { NextResponse } from "next/server";
 import { PutCommand } from "@aws-sdk/lib-dynamodb";
-import { dynamoDbClient as docClient } from "@/lib/aws-config";
+import { getDynamoDbClient } from "@/lib/aws-config";
 import { DELHI_NODES } from "@/lib/mock-data";
 
 export async function GET() {
   const ddbTable = process.env.DDB_TABLE?.trim();
+  const docClient = getDynamoDbClient();
   try {
     for (const node of DELHI_NODES) {
       await docClient.send(new PutCommand({

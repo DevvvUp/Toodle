@@ -1,9 +1,14 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const runtime = "nodejs";
+
 import { NextResponse } from "next/server";
 import { ScanCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
-import { dynamoDbClient as docClient } from "@/lib/aws-config";
+import { getDynamoDbClient } from "@/lib/aws-config";
 
 export async function GET() {
   const ddbTable = process.env.DDB_TABLE?.trim();
+  const docClient = getDynamoDbClient();
   try {
     const res = await docClient.send(new ScanCommand({
       TableName: ddbTable!,
@@ -18,6 +23,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const ddbTable = process.env.DDB_TABLE?.trim();
+  const docClient = getDynamoDbClient();
   try {
     const body = await req.json();
     const { nodeId, v_pooling, a_impedance, rain_rate } = body || {};

@@ -1,6 +1,10 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const runtime = "nodejs";
+
 import { NextResponse } from "next/server";
 import { DetectLabelsCommand } from "@aws-sdk/client-rekognition";
-import { rekognitionClient as client } from "@/lib/aws-config";
+import { getRekognitionClient } from "@/lib/aws-config";
 
 export async function POST(req: Request) {
   try {
@@ -17,6 +21,7 @@ export async function POST(req: Request) {
     }
 
     const buffer = Buffer.from(imageBase64, "base64");
+    const client = getRekognitionClient();
 
     try {
       const response = await client.send(

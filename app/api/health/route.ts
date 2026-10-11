@@ -1,5 +1,9 @@
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const runtime = "nodejs";
+
 import { NextResponse } from 'next/server';
-import { dynamoDbClient, snsClient, stsClient, getCredentialSource, AWS_REGION } from '@/lib/aws-config';
+import { getDynamoDbClient, getSnsClient, getStsClient, getCredentialSource, getAwsRegion } from '@/lib/aws-config';
 import { DescribeTableCommand } from '@aws-sdk/client-dynamodb';
 import { GetTopicAttributesCommand } from '@aws-sdk/client-sns';
 import { GetCallerIdentityCommand } from '@aws-sdk/client-sts';
@@ -73,9 +77,13 @@ function formatLiveCheckError(err: unknown): LiveCheckError {
 }
 
 export async function GET() {
+  const generatedAt = new Date().toISOString();
+  const requestId = crypto.randomUUID();
+
   const ddbTable = process.env.DDB_TABLE?.trim();
   const snsTopic = process.env.SNS_TOPIC_ARN?.trim();
   const appAwsRegion = process.env.APP_AWS_REGION?.trim();
+  const activeRegion = getAwsRegion();
 
   const envVars = {
     DDB_TABLE: !!ddbTable,
@@ -90,6 +98,11 @@ export async function GET() {
   };
 
   const credentialSource = getCredentialSource();
+
+  // Lazy AWS clients created per request
+  const stsClient = getStsClient();
+  const dynamoDbClient = getDynamoDbClient();
+  const snsClient = getSnsClient();
 
   // STS GetCallerIdentity with 8s timeout
   let identity: { account?: string; arn?: string } | LiveCheckError;
@@ -144,15 +157,24 @@ export async function GET() {
     }
   }
 
-  return NextResponse.json({
-    region: AWS_REGION,
-    identity,
-    resolved,
-    envVars,
-    credentialSource,
-    liveChecks: {
-      dynamoDb: ddbStatus,
-      sns: snsStatus,
+  return NextResponse.json(
+    {
+      generatedAt,
+      requestId,
+      region: activeRegion,
+      identity,
+      resolved,
+      envVars,
+      credentialSource,
+      liveChecks: {
+        dynamoDb: ddbStatus,
+        sns: snsStatus,
+      },
     },
-  });
+    {
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    }
+  );
 }
