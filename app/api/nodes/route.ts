@@ -3,9 +3,10 @@ import { ScanCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { dynamoDbClient as docClient } from "@/lib/aws-config";
 
 export async function GET() {
+  const ddbTable = process.env.DDB_TABLE?.trim();
   try {
     const res = await docClient.send(new ScanCommand({
-      TableName: process.env.DDB_TABLE!,
+      TableName: ddbTable!,
       FilterExpression: "SK = :sk",
       ExpressionAttributeValues: { ":sk": "METADATA" }
     }));
@@ -16,6 +17,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const ddbTable = process.env.DDB_TABLE?.trim();
   try {
     const body = await req.json();
     const { nodeId, v_pooling, a_impedance, rain_rate } = body || {};
@@ -24,7 +26,7 @@ export async function POST(req: Request) {
     const fri = (v_pooling * 0.55) + (a_impedance * 0.35) + (rain_rate * 0.10);
     
     await docClient.send(new PutCommand({
-      TableName: process.env.DDB_TABLE!,
+      TableName: ddbTable!,
       Item: {
         PK: `NODE#${nodeId || '4'}`,
         SK: `READING#${timestamp}`,

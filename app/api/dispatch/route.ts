@@ -12,9 +12,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "FRI below critical threshold" }, { status: 400 });
     }
 
+    const ddbTable = process.env.DDB_TABLE?.trim();
+    const snsTopic = process.env.SNS_TOPIC_ARN?.trim();
+
     const now = Date.now();
     const getRes = await ddb.send(new GetCommand({
-      TableName: process.env.DDB_TABLE!,
+      TableName: ddbTable!,
       Key: { PK: `ALERT#${nodeId}`, SK: "COOLDOWN" }
     }));
     
@@ -29,14 +32,14 @@ export async function POST(req: Request) {
     const message = `[CRITICAL ALERT - FLOODGUARD AI]\nNode: #${nodeId} (${nodeName})\nRisk Score: ${fri} | Drain Status: ${drainStatus}\nRec. Action: ${action}`;
 
     const snsRes = await sns.send(new PublishCommand({
-      TopicArn: process.env.SNS_TOPIC_ARN!,
+      TopicArn: snsTopic!,
       Message: message,
       Subject: `FloodGuard Alert: Node ${nodeId}`
     }));
 
     await ddb.send(new BatchWriteCommand({
       RequestItems: {
-        [process.env.DDB_TABLE!]: [
+        [ddbTable!]: [
           {
             PutRequest: {
               Item: {

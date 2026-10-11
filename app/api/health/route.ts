@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import { dynamoDbClient, snsClient, getCredentialSource, AWS_REGION } from '@/lib/aws-config';
+import { dynamoDbClient, snsClient, stsClient, getCredentialSource, AWS_REGION } from '@/lib/aws-config';
 import { DescribeTableCommand } from '@aws-sdk/client-dynamodb';
 import { GetTopicAttributesCommand } from '@aws-sdk/client-sns';
+import { GetCallerIdentityCommand } from '@aws-sdk/client-sts';
 
 interface LiveCheckError {
   status: "Error";
@@ -82,7 +83,32 @@ export async function GET() {
     APP_AWS_REGION: !!appAwsRegion,
   };
 
+  const resolved = {
+    ddbTable: JSON.stringify(process.env.DDB_TABLE ?? null),
+    snsTopicArn: JSON.stringify(process.env.SNS_TOPIC_ARN ?? null),
+    region: JSON.stringify(process.env.APP_AWS_REGION ?? process.env.AWS_REGION ?? null),
+  };
+
   const credentialSource = getCredentialSource();
+
+  // STS GetCallerIdentity with 8s timeout
+  let identity: { account?: string; arn?: string } | LiveCheckError;
+  const stsController = new AbortController();
+  const stsTimeoutId = setTimeout(() => stsController.abort(), 8000);
+  try {
+    const callerId = await stsClient.send(
+      new GetCallerIdentityCommand({}),
+      { abortSignal: stsController.signal }
+    );
+    identity = {
+      account: callerId.Account,
+      arn: callerId.Arn,
+    };
+  } catch (err: unknown) {
+    identity = formatLiveCheckError(err);
+  } finally {
+    clearTimeout(stsTimeoutId);
+  }
 
   let ddbStatus: LiveCheckResult = "SKIPPED";
   if (ddbTable) {
@@ -120,6 +146,8 @@ export async function GET() {
 
   return NextResponse.json({
     region: AWS_REGION,
+    identity,
+    resolved,
     envVars,
     credentialSource,
     liveChecks: {
