@@ -17,7 +17,7 @@ export default function AboutPage() {
   ];
 
   return (
-    <main className="min-h-screen bg-[#000000] text-neutral-300 relative w-full flex flex-col">
+    <main className="min-h-screen bg-[#000000] text-neutral-300 relative w-full flex flex-col overflow-x-clip">
       <FloatingNav navItems={navItems} />
 
       {/* HERO WRAPPER */}

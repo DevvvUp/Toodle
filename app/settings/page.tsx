@@ -25,6 +25,15 @@ export default function SettingsPage() {
     }
   }, []);
 
+  useEffect(() => {
+    if (!showConfirmModal) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowConfirmModal(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showConfirmModal]);
+
   const runChecks = async () => {
     setRunning(true);
     const check = async (path: string, options?: RequestInit) => {
@@ -275,29 +284,39 @@ export default function SettingsPage() {
 
         {/* Confirm Modal */}
         {showConfirmModal && (
-          <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="w-full max-w-[360px] bg-[#141414] border border-[#262626] rounded-[20px] p-5 shadow-2xl flex flex-col gap-3">
+          <div
+            className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setShowConfirmModal(false);
+            }}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              className="w-full sm:max-w-[380px] max-h-[90dvh] overflow-y-auto custom-scrollbar bg-[#141414] border border-[#262626] rounded-t-[20px] sm:rounded-[20px] p-5 shadow-2xl flex flex-col gap-3 animate-in fade-in duration-150"
+            >
               <div className="flex items-center gap-2 text-[#ef4444]">
-                <AlertCircle className="w-5 h-5" />
+                <AlertCircle className="w-5 h-5 shrink-0" />
                 <h3 className="font-bold text-[16px] text-white">
                   Send Test Alert
                 </h3>
               </div>
-              <p className="text-[13px] text-[#999999]">
+              <p className="text-[13px] text-[#999999] leading-relaxed break-words">
                 This will trigger a real SNS dispatch test to registered subscribers. Proceed?
               </p>
               <div className="flex items-center gap-2 mt-2">
                 <button
                   onClick={() => setShowConfirmModal(false)}
-                  className="flex-1 py-2.5 rounded-full bg-[#1c1c1c] text-white text-xs font-semibold border border-[#262626] hover:bg-[#262626]"
+                  className="flex-1 py-3 rounded-full bg-[#1c1c1c] text-white text-xs font-semibold border border-[#262626] hover:bg-[#262626] min-h-[44px] flex items-center justify-center"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSendTestAlert}
-                  className="flex-1 py-2.5 rounded-full bg-[#7f1d1d] text-[#fca5a5] border border-[#ef4444] text-xs font-bold hover:bg-[#991b1b]"
+                  disabled={alertSending}
+                  className="flex-1 py-3 rounded-full bg-[#7f1d1d] text-[#fca5a5] border border-[#ef4444] text-xs font-bold hover:bg-[#991b1b] min-h-[44px] flex items-center justify-center"
                 >
-                  Send
+                  {alertSending ? "Sending..." : "Send"}
                 </button>
               </div>
             </div>

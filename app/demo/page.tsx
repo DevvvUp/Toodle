@@ -408,14 +408,14 @@ export default function DemoPage() {
         {/* Viewfinder when capturing */}
         {!imageUri && (
           <div className="flex flex-col gap-4">
-            <div className="w-full aspect-[3/4] bg-[#141414] rounded-[20px] border border-[#262626] overflow-hidden relative flex flex-col items-center justify-center shadow-lg">
+            <div className="w-full aspect-[3/4] max-h-[70dvh] bg-[#141414] rounded-[20px] border border-[#262626] overflow-hidden relative flex flex-col items-center justify-center shadow-lg">
               {cameraError ? (
                 <div className="p-4 text-center">
                   <AlertTriangle className="w-8 h-8 text-[#ef4444] mx-auto mb-2" />
                   <p className="text-xs text-[#999999] mb-3">{cameraError}</p>
                   <button
                     onClick={() => setImageUri(null)}
-                    className="px-4 py-2 bg-[#1c1c1c] text-white rounded-full text-xs border border-[#262626]"
+                    className="px-4 py-2 bg-[#1c1c1c] text-white rounded-full text-xs border border-[#262626] min-h-[44px]"
                   >
                     Retry Camera
                   </button>
@@ -426,7 +426,7 @@ export default function DemoPage() {
                   playsInline
                   autoPlay
                   muted
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain bg-black"
                 />
               )}
             </div>
@@ -448,12 +448,12 @@ export default function DemoPage() {
 
         {/* Display Captured Image & Overlays */}
         {imageUri && (
-          <div className="w-full aspect-[3/4] bg-[#141414] rounded-[20px] border border-[#262626] overflow-hidden relative mb-5 shadow-lg">
+          <div className="w-full aspect-[3/4] max-h-[70dvh] bg-[#141414] rounded-[20px] border border-[#262626] overflow-hidden relative mb-5 shadow-lg flex items-center justify-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={imageUri}
               alt="Field capture"
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain"
             />
 
             {analyzing && (

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useEffect } from "react";
 import { CalculatedNode } from "@/lib/api";
 import { X, Truck, Thermometer, CloudRain, Wind, Droplets } from "lucide-react";
 import {
@@ -30,6 +30,14 @@ export function NodeSheet({
   onDispatch,
   dispatching,
 }: NodeSheetProps) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   // Generate 60-minute history curve ending at current node FRI
   const chartData = useMemo(() => {
     const points = [];
@@ -59,24 +67,36 @@ export function NodeSheet({
   };
 
   return (
-    <div className="bg-[#141414] border border-[#262626] rounded-[20px] p-4 flex flex-col gap-3 shadow-2xl">
-      {/* Header */}
-      <div className="flex items-center justify-between pb-2 border-b border-[#262626]/60">
-        <div>
-          <h3 className="font-bold text-[16px] text-white tracking-tight">
-            {node.name}
-          </h3>
-          <span className="text-[11px] text-[#999999]">
-            {node.region} · {node.drainType}
-          </span>
+    <div
+      className="fixed inset-0 z-[5000] bg-black/80 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="node-sheet-title"
+        className="w-full md:max-w-[480px] max-h-[90dvh] overflow-y-auto custom-scrollbar bg-[#141414] border border-[#262626] rounded-t-[24px] md:rounded-[24px] p-5 flex flex-col gap-3 shadow-2xl animate-in fade-in duration-150"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between pb-2 border-b border-[#262626]/60">
+          <div className="min-w-0 pr-2">
+            <h3 id="node-sheet-title" className="font-bold text-[16px] text-white tracking-tight truncate">
+              {node.name}
+            </h3>
+            <span className="text-[11px] text-[#999999] truncate block">
+              {node.region} · {node.drainType}
+            </span>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 text-[#999999] hover:text-white rounded-full bg-[#1c1c1c] shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
+            aria-label="Close details"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
-        <button
-          onClick={onClose}
-          className="p-1.5 text-[#999999] hover:text-white rounded-full bg-[#1c1c1c]"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
 
       {/* Primary FRI Metric */}
       <div className="flex items-center justify-between py-1 border-b border-[#1a1a1a]">
@@ -249,6 +269,7 @@ export function NodeSheet({
           </span>
         </button>
       )}
+      </div>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useCallback } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -38,15 +38,65 @@ function MapController({
   const map = useMap();
   const hasFitted = useRef(false);
 
-  useEffect(() => {
-    if (nodes.length > 0 && !hasFitted.current) {
+  const fitNodes = useCallback(() => {
+    if (nodes.length > 0) {
       const bounds = nodes.map((n) => [n.lat, n.lng] as [number, number]);
       if (bounds.length > 0) {
         map.fitBounds(bounds, { padding: [24, 24] });
-        hasFitted.current = true;
       }
     }
   }, [nodes, map]);
+
+  useEffect(() => {
+    const container = map.getContainer();
+    if (!container) return;
+
+    const handleResize = () => {
+      map.invalidateSize();
+      if (!hasFitted.current && nodes.length > 0) {
+        const rect = container.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          fitNodes();
+          hasFitted.current = true;
+        }
+      }
+    };
+
+    // Run on mount
+    handleResize();
+
+    const observer = new ResizeObserver(() => {
+      handleResize();
+    });
+    observer.observe(container);
+
+    const handleOrientation = () => {
+      map.invalidateSize();
+      if (nodes.length > 0) {
+        fitNodes();
+      }
+    };
+    window.addEventListener("orientationchange", handleOrientation);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("orientationchange", handleOrientation);
+    };
+  }, [map, nodes, fitNodes]);
+
+  useEffect(() => {
+    if (nodes.length > 0 && !hasFitted.current) {
+      const container = map.getContainer();
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          map.invalidateSize();
+          fitNodes();
+          hasFitted.current = true;
+        }
+      }
+    }
+  }, [nodes, fitNodes, map]);
 
   useEffect(() => {
     if (selectedNodeId === "user" && userLocation) {
@@ -90,13 +140,13 @@ export default function ToodleMap({
 
   return (
     <div
-      className={`w-full h-full relative z-0 select-none ${
+      className={`w-full h-full min-h-[280px] relative z-0 select-none ${
         !isSatellite ? "dark-map-tiles" : ""
       }`}
     >
       <MapContainer
         center={[28.6139, 77.209]}
-        zoom={11}
+        zoom={10}
         style={{ height: "100%", width: "100%", background: "#090909" }}
         zoomControl={false}
         attributionControl={false}
@@ -112,17 +162,21 @@ export default function ToodleMap({
             url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
             attribution="Tiles &copy; Esri"
             maxZoom={19}
+            keepBuffer={4}
+            updateWhenIdle={false}
           />
         ) : (
           <TileLayer
             url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution="&copy; OpenStreetMap contributors"
             maxZoom={19}
+            keepBuffer={4}
+            updateWhenIdle={false}
           />
         )}
 
         {showRadar && radarUrl && (
-          <TileLayer url={radarUrl} opacity={0.6} maxZoom={19} />
+          <TileLayer url={radarUrl} opacity={0.6} maxZoom={19} keepBuffer={4} updateWhenIdle={false} />
         )}
 
         {/* User Location Accuracy Circle */}

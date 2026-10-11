@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { CalculatedNode, dispatchUnit } from "@/lib/api";
 import { AlertCircle, CheckCircle, Truck, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -19,6 +19,14 @@ export function SmsPreviewModal({
   const [dispatching, setDispatching] = useState(false);
   const [dispatchSent, setDispatchSent] = useState(false);
   const [cooldownMsg, setCooldownMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
   const shouldIncludeCoords = node.lat && node.lng;
   const mapLink = shouldIncludeCoords
@@ -58,19 +66,30 @@ export function SmsPreviewModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[6000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="w-full max-w-[420px] bg-[#141414] border border-[#262626] rounded-[24px] p-5 shadow-2xl flex flex-col gap-4">
+    <div
+      className="fixed inset-0 z-[6000] bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="sms-modal-title"
+        className="w-full sm:max-w-[440px] max-h-[90dvh] overflow-y-auto custom-scrollbar bg-[#141414] border border-[#262626] rounded-t-[24px] sm:rounded-[24px] p-5 shadow-2xl flex flex-col gap-4 animate-in fade-in duration-150"
+      >
         {/* Header */}
         <div className="flex items-center justify-between pb-2 border-b border-[#262626]">
-          <div className="flex items-center gap-2 text-[#ef4444]">
+          <div className="flex items-center gap-2 text-[#ef4444] min-w-0 pr-2">
             <AlertCircle className="w-5 h-5 shrink-0" />
-            <h3 className="font-bold text-[16px] text-white">
+            <h3 id="sms-modal-title" className="font-bold text-[16px] text-white truncate">
               Emergency Dispatch Alert
             </h3>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-full text-[#999999] hover:text-white bg-[#1c1c1c]"
+            className="p-2 rounded-full text-[#999999] hover:text-white bg-[#1c1c1c] min-h-[44px] min-w-[44px] flex items-center justify-center shrink-0"
+            aria-label="Close alert preview"
           >
             <X className="w-4 h-4" />
           </button>
