@@ -8,11 +8,12 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
-export default function MarketingPage() {
+export default function AboutPage() {
   const navItems = [
     { name: "Features", link: "#features" },
     { name: "How it Works", link: "#how-it-works" },
     { name: "Impact", link: "#impact" },
+    { name: "App", link: "/command-center" },
   ];
 
   return (
@@ -39,7 +40,7 @@ export default function MarketingPage() {
             
             {/* LEFT COLUMN */}
             <div className="flex flex-col items-start text-left">
-              <Link href="/dashboard?autoplay=storm" className="h-8 px-3 rounded-full border border-white/10 bg-white/5 flex items-center gap-2 text-sm text-neutral-200 hover:bg-white/10 transition-colors mb-6 group">
+              <Link href="/command-center" className="h-8 px-3 rounded-full border border-white/10 bg-white/5 flex items-center gap-2 text-sm text-neutral-200 hover:bg-white/10 transition-colors mb-6 group">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 <span>Live storm simulator</span>
                 <span className="w-px h-4 bg-white/10 mx-1" />
@@ -57,7 +58,7 @@ export default function MarketingPage() {
               
               <div className="mt-10 flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
                 <Link 
-                  href="/dashboard"
+                  href="/command-center"
                   className="w-full sm:w-auto h-12 px-6 rounded-xl bg-white text-neutral-950 text-base font-medium inline-flex items-center justify-center gap-2 transition-all hover:bg-neutral-100 hover:-translate-y-px active:scale-[0.98] ring-1 ring-white/40 ring-offset-2 ring-offset-black focus-visible:ring-2 focus-visible:ring-cyan-400 group"
                 >
                   Launch Command Center
@@ -71,7 +72,7 @@ export default function MarketingPage() {
                 </Link>
               </div>
               
-              <Link href="/dashboard?autoplay=storm" className="mt-6 text-sm text-neutral-300 hover:text-white transition-colors underline underline-offset-4 group inline-flex items-center gap-1">
+              <Link href="/command-center" className="mt-6 text-sm text-neutral-300 hover:text-white transition-colors underline underline-offset-4 group inline-flex items-center gap-1">
                 Watch the storm simulate in 10 seconds 
                 <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
               </Link>
@@ -198,7 +199,7 @@ export default function MarketingPage() {
              Intelligence at the Edge
            </h2>
            <p className="mt-5 text-lg leading-8 text-neutral-300 max-w-2xl">
-             Every street corner becomes a proactive sensor. FloodGuard reuses existing hardware to deliver millisecond-level telemetry.
+             Every street corner becomes a proactive sensor. Toodle reuses existing hardware to deliver millisecond-level telemetry.
            </p>
         </div>
         
@@ -289,10 +290,10 @@ export default function MarketingPage() {
       <section className="py-24 md:py-32 px-6 lg:px-8 w-full text-center flex flex-col items-center justify-center">
          <h2 className="text-3xl md:text-5xl font-semibold tracking-[-0.03em] text-white mb-8">Ready to clear the streets?</h2>
          <Link 
-            href="/dashboard"
+            href="/command-center"
             className="h-12 px-8 rounded-xl bg-white text-neutral-950 text-base font-medium inline-flex items-center justify-center gap-2 transition-all hover:bg-neutral-100 hover:-translate-y-px active:scale-[0.98] ring-1 ring-white/40 ring-offset-2 ring-offset-black focus-visible:ring-2 focus-visible:ring-cyan-400 group"
           >
-            Launch Simulator
+            Launch Command Center
             <Activity className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
           </Link>
       </section>

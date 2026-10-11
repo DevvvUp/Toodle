@@ -3,7 +3,8 @@ import React, { useEffect, useState } from "react";
 import { motion, useScroll, useSpring } from "framer-motion";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { Droplet, Search, ShieldAlert, Menu, X } from "lucide-react";
+import Image from "next/image";
+import { Search, Menu, X } from "lucide-react";
 
 export const FloatingNav = ({
   navItems,
@@ -52,11 +53,8 @@ export const FloatingNav = ({
         <div className="max-w-7xl mx-auto px-6 lg:px-8 w-full flex items-center h-full">
           {/* Left: Logo */}
           <Link href="/" className="flex items-center gap-2 group">
-            <div className="relative flex items-center justify-center text-cyan-400">
-              <ShieldAlert className="w-6 h-6 absolute" />
-              <Droplet className="w-3 h-3 fill-cyan-400 absolute mt-1" />
-            </div>
-            <span className="text-lg font-semibold tracking-tight text-white ml-6">FloodGuard AI</span>
+            <Image src="/brand/toodle-logo-white.png" alt="Toodle" width={24} height={24} className="w-6 h-6 object-contain" />
+            <span className="text-lg font-semibold tracking-tight text-white ml-2">Toodle</span>
           </Link>
 
           {/* Desktop Nav Links */}
@@ -92,7 +90,7 @@ export const FloatingNav = ({
               Demo
             </Link>
             <Link 
-              href="/dashboard" 
+              href="/command-center" 
               className="h-10 px-4 rounded-xl bg-white text-neutral-950 text-sm font-medium inline-flex items-center justify-center transition-all hover:bg-neutral-100 hover:-translate-y-px active:scale-[0.98] ring-1 ring-white/40 ring-offset-2 ring-offset-black focus-visible:ring-2 focus-visible:ring-cyan-400"
             >
               Launch Command Center
@@ -121,7 +119,7 @@ export const FloatingNav = ({
           <div className="mt-8 flex flex-col gap-4">
             <Link href="/demo" className="text-lg text-neutral-300" onClick={() => setMenuOpen(false)}>Demo</Link>
             <Link 
-              href="/dashboard" 
+              href="/command-center" 
               className="h-12 w-full rounded-xl bg-white text-neutral-950 text-lg font-medium inline-flex items-center justify-center mt-4 ring-1 ring-white/40"
               onClick={() => setMenuOpen(false)}
             >

@@ -4,18 +4,19 @@
 
 @layer base {
   :root {
-    --background: 0 0% 0%;
+    --background: 0 0% 3.5%;
     --foreground: 0 0% 100%;
   }
 }
 
 html {
   scroll-behavior: smooth;
+  background-color: #090909;
 }
 
 body {
-  color: hsl(var(--foreground));
-  background: hsl(var(--background));
+  color: #ffffff;
+  background: #090909;
   font-feature-settings: "cv11" 1, "ss01" 1;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -33,7 +34,7 @@ body {
 
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #404040 transparent;
+  scrollbar-color: #262626 transparent;
 }
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
@@ -43,7 +44,7 @@ body {
   background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: #404040;
+  background-color: #262626;
   border-radius: 10px;
 }
 

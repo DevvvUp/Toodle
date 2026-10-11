@@ -1,303 +1,702 @@
 "use client";
-import React, { useState, useRef } from "react";
-import Link from "next/link";
-import { UploadCloud, CheckCircle2, AlertCircle } from "lucide-react";
-import { HoverBorderGradient } from "@/components/ui/hover-border-gradient";
+
+import React, { useState, useRef, useEffect } from "react";
+import { MobileShell } from "@/components/mobile-shell";
+import { analyzeImage, dispatchUnit } from "@/lib/api";
+import { validateRoadImage, RoadValidationResult } from "@/lib/imageValidation";
+import { useSimulatorStore } from "@/store/simulator-store";
+import {
+  Camera,
+  AlertTriangle,
+  CheckCircle,
+  Activity,
+  MapPin,
+  Loader2,
+} from "lucide-react";
 import { toast } from "sonner";
 
-interface AnalysisResult {
-  error?: string;
-  labels: { Name: string; Confidence: number; Instances?: { BoundingBox: { Left: number, Top: number, Width: number, Height: number } }[] }[];
-  vPooling: number;
-  floodDetected?: boolean;
+const SHOW_DEBUG_LABELS = true;
+const MAX_LABELS_SHOWN = 4;
+
+const FLOOD_PRIORITY_LABELS = [
+  "flood",
+  "flash flood",
+  "water",
+  "puddle",
+  "road",
+  "street",
+  "asphalt",
+  "tarmac",
+  "intersection",
+  "highway",
+  "pavement",
+  "vehicle",
+  "car",
+  "motorcycle",
+];
+
+const FLOOD_PRIORITY_SET = new Set(FLOOD_PRIORITY_LABELS.map((s) => s.toLowerCase()));
+
+interface LabelInstance {
+  BoundingBox?: {
+    Top: number;
+    Left: number;
+    Width: number;
+    Height: number;
+  };
+}
+
+interface LabelItem {
+  Name?: string;
+  name?: string;
+  Confidence?: number;
+  confidence?: number;
+  Instances?: LabelInstance[];
+}
+
+interface GeotagData {
+  latitude: number;
+  longitude: number;
+  accuracyMeters: number;
+  altitude: number | null;
+  capturedAt: string;
+  mocked: boolean;
+}
+
+interface AnalysisResultData {
+  labels?: LabelItem[];
+  v_pooling?: number;
+  flood_detected?: boolean;
   reason?: string;
-  roadVerified?: boolean;
-  screenDetected?: boolean;
+  error?: string;
+  dispatchError?: string;
+}
+
+function getTopDisplayLabels(labels: LabelItem[] = []): LabelItem[] {
+  const safeLabels = Array.isArray(labels) ? labels : [];
+
+  const sorted = [...safeLabels].sort((a, b) => {
+    const aName = ((a.Name || a.name || "") as string).toLowerCase().trim();
+    const bName = ((b.Name || b.name || "") as string).toLowerCase().trim();
+    const aConf = typeof a.Confidence === "number" ? a.Confidence : typeof a.confidence === "number" ? a.confidence : 0;
+    const bConf = typeof b.Confidence === "number" ? b.Confidence : typeof b.confidence === "number" ? b.confidence : 0;
+
+    const aPrio = FLOOD_PRIORITY_SET.has(aName);
+    const bPrio = FLOOD_PRIORITY_SET.has(bName);
+
+    if (aPrio && !bPrio) return -1;
+    if (!aPrio && bPrio) return 1;
+    return bConf - aConf;
+  });
+
+  const seen = new Set<string>();
+  const top: LabelItem[] = [];
+  for (const item of sorted) {
+    const key = ((item.Name || item.name || "") as string).toLowerCase().trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    top.push(item);
+    if (top.length >= MAX_LABELS_SHOWN) break;
+  }
+
+  return top;
 }
 
 export default function DemoPage() {
+  const [imageUri, setImageUri] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
-  const [result, setResult] = useState<null | AnalysisResult>(null);
-  const [imageSrc, setImageSrc] = useState<string | null>(null);
-  const [dispatching, setDispatching] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
+  const [result, setResult] = useState<AnalysisResultData | null>(null);
+  const [validation, setValidation] = useState<RoadValidationResult | null>(null);
   const [showAllLabels, setShowAllLabels] = useState(false);
-  const dropzoneRef = useRef<HTMLDivElement>(null);
-  const priorityLabels = ["Flood", "Flash Flood", "Water", "Puddle", "Road", "Street", "Asphalt", "Car", "Vehicle"];
+  const [dispatching, setDispatching] = useState(false);
+  const [smsPreview, setSmsPreview] = useState("");
+  const [geotag, setGeotag] = useState<GeotagData | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [cameraError, setCameraError] = useState<string | null>(null);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
+  const addFieldReport = useSimulatorStore((state) => state.addFieldReport);
+
+  // Initialize camera
+  useEffect(() => {
+    let active = true;
+
+    async function startCamera() {
+      setCameraError(null);
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) {
+          throw new Error("Camera API is not supported in this browser");
+        }
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } },
+          audio: false,
+        });
+        if (!active) {
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play().catch(() => {});
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Failed to access camera";
+        setCameraError(msg);
+      }
+    }
+
+    if (!imageUri) {
+      startCamera();
+    }
+
+    return () => {
+      active = false;
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+    };
+  }, [imageUri]);
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+  };
+
+  const getAlertEligibility = (): { canSend: boolean; reason: string } => {
+    if (!validation || !validation.valid) {
+      return { canSend: false, reason: validation?.reason || "Image not verified as a real road" };
+    }
+    if (!result?.flood_detected) {
+      return { canSend: false, reason: "No flood detected in image" };
+    }
+    if ((result?.v_pooling || 0) < 0.70) {
+      return { canSend: false, reason: "Flood risk (V_pooling) below critical threshold (0.70)" };
+    }
+    if (!geotag) {
+      return { canSend: false, reason: "GPS location required" };
+    }
+    if (geotag.mocked === true) {
+      return { canSend: false, reason: "Mocked GPS locations are not allowed for alerts" };
+    }
+    const capturedTimestamp = new Date(geotag.capturedAt).getTime();
+    const ageMs = Date.now() - capturedTimestamp;
+    if (ageMs > 2 * 60 * 1000 || ageMs < -60000) {
+      return { canSend: false, reason: "Geotag expired (must be captured within 2 minutes)" };
+    }
+    return { canSend: true, reason: "" };
+  };
+
+  const capturePhoto = async () => {
+    setLocationError(null);
+
+    // 1. Mandatory high-accuracy GPS with 10s timeout
+    let loc: GeolocationPosition;
+    try {
+      loc = await new Promise<GeolocationPosition>((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error("Geolocation not supported"));
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 5000,
+        });
+      });
+    } catch {
+      setLocationError("Failed to get location fix within 10s. Please ensure GPS is active.");
+      return;
+    }
+
+    const gTag: GeotagData = {
+      latitude: loc.coords.latitude,
+      longitude: loc.coords.longitude,
+      accuracyMeters: loc.coords.accuracy,
+      altitude: loc.coords.altitude,
+      capturedAt: new Date().toISOString(),
+      mocked: false,
+    };
+    setGeotag(gTag);
+
+    // 2. Capture frame from video element
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const vw = video.videoWidth || 640;
+    const vh = video.videoHeight || 480;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = vw;
+    canvas.height = vh;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, vw, vh);
+
+    const initialDataUrl = canvas.toDataURL("image/jpeg", 0.9);
+    stopCamera();
+    processImage(initialDataUrl, gTag);
+  };
+
+  const processImage = async (dataUrl: string, currentGeotag: GeotagData) => {
+    setImageUri(dataUrl);
     setAnalyzing(true);
     setResult(null);
+    setValidation(null);
+    setSmsPreview("");
 
-    const reader = new FileReader();
-    reader.onload = (ev) => {
+    try {
+      // 3. Resize to max 1280px and keep under 2MB
       const img = new Image();
-      img.onload = async () => {
-        const MAX_SIZE = 1600;
-        let width = img.width;
-        let height = img.height;
+      img.src = dataUrl;
+      await new Promise((res) => {
+        img.onload = res;
+      });
 
-        if (width > height) {
-          if (width > MAX_SIZE) {
-            height *= MAX_SIZE / width;
-            width = MAX_SIZE;
-          }
-        } else {
-          if (height > MAX_SIZE) {
-            width *= MAX_SIZE / height;
-            height = MAX_SIZE;
-          }
-        }
+      const MAX_SIZE = 1280;
+      let w = img.width;
+      let h = img.height;
+      if (w > h && w > MAX_SIZE) {
+        h = (h * MAX_SIZE) / w;
+        w = MAX_SIZE;
+      } else if (h > w && h > MAX_SIZE) {
+        w = (w * MAX_SIZE) / h;
+        h = MAX_SIZE;
+      }
 
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
-          setImageSrc(dataUrl);
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas context unavailable");
+      ctx.drawImage(img, 0, 0, w, h);
 
-          try {
-            const res = await fetch("/api/analyze", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ imageBase64: dataUrl.split(",")[1] }),
-            });
-            const data = await res.json();
-            
-            if (!res.ok) {
-              toast.error(data.error || "Analysis failed");
-              setResult({ error: data.error || "Analysis failed", labels: [], vPooling: 0, floodDetected: false });
-            } else {
-              const sortedLabels = (data.labels || []).sort((a: { Name: string, Confidence: number }, b: { Name: string, Confidence: number }) => {
-                const aPrio = priorityLabels.includes(a.Name);
-                const bPrio = priorityLabels.includes(b.Name);
-                if (aPrio && !bPrio) return -1;
-                if (!aPrio && bPrio) return 1;
-                return b.Confidence - a.Confidence;
-              });
-              setResult({
-                labels: sortedLabels,
-                vPooling: data.v_pooling,
-                floodDetected: data.flood_detected,
-                reason: data.reason,
-                roadVerified: data.roadVerified,
-                screenDetected: data.screenDetected
-              });
-            }
-          } catch (err: unknown) {
-            const errMsg = err instanceof Error ? err.message : "Network error analyzing image";
-            toast.error(errMsg);
-            setResult({ error: errMsg, labels: [], vPooling: 0, floodDetected: false });
-          } finally {
-            setAnalyzing(false);
-          }
-        }
-      };
-      img.src = ev.target?.result as string;
-    };
-    reader.readAsDataURL(file);
+      let quality = 0.7;
+      let compressedDataUrl = canvas.toDataURL("image/jpeg", quality);
+
+      // Ensure base64 string is < 2MB (2 * 1024 * 1024 chars)
+      while (compressedDataUrl.length > 2 * 1024 * 1024 && quality > 0.15) {
+        quality -= 0.15;
+        w *= 0.85;
+        h *= 0.85;
+        canvas.width = w;
+        canvas.height = h;
+        ctx.drawImage(img, 0, 0, w, h);
+        compressedDataUrl = canvas.toDataURL("image/jpeg", quality);
+      }
+
+      setImageUri(compressedDataUrl);
+
+      // Strip prefix for API
+      const base64Payload = compressedDataUrl.replace(/^data:image\/[a-z]+;base64,/, "");
+      const data = await analyzeImage(base64Payload) as AnalysisResultData;
+
+      const rawLabels = (data.labels || []) as LabelItem[];
+      const sortedLabels = rawLabels.sort((a, b) => {
+        const aPrio = FLOOD_PRIORITY_SET.has((a.Name || a.name || "").toLowerCase().trim());
+        const bPrio = FLOOD_PRIORITY_SET.has((b.Name || b.name || "").toLowerCase().trim());
+        if (aPrio && !bPrio) return -1;
+        if (!aPrio && bPrio) return 1;
+        return (b.Confidence ?? b.confidence ?? 0) - (a.Confidence ?? a.confidence ?? 0);
+      });
+
+      const roadVal = validateRoadImage(sortedLabels);
+      setValidation(roadVal);
+      setResult({ ...data, labels: sortedLabels });
+
+      // Only save report globally when image is a valid road scene
+      if (roadVal.valid) {
+        addFieldReport({
+          id: Math.random().toString(36).substring(2, 9),
+          uri: compressedDataUrl,
+          lat: currentGeotag.latitude,
+          lng: currentGeotag.longitude,
+          verdict: data.flood_detected ? "Flood Detected" : "No Flood",
+          vPooling: data.v_pooling || 0,
+          timestamp: currentGeotag.capturedAt,
+          floodDetected: data.flood_detected || false,
+          accuracy: currentGeotag.accuracyMeters,
+          mocked: currentGeotag.mocked,
+        });
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Analysis failed";
+      setResult({ error: msg });
+      toast.error(msg);
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   const handleDispatch = async () => {
-    if (result?.screenDetected) {
-      toast.error("Image detected as a screen. Dispatch is disabled.");
+    const eligibility = getAlertEligibility();
+    if (!eligibility.canSend) {
+      setResult((prev) => ({ ...(prev || {}), dispatchError: eligibility.reason }));
       return;
     }
+
     setDispatching(true);
     try {
-      const res = await fetch("/api/dispatch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          nodeId: 4, 
-          nodeName: "DTU Main Gate", 
-          fri: 0.92, 
-          drainStatus: "Simulated Choke", 
-          action: "Dispatch Response Unit",
-          screenDetected: result?.screenDetected
-        })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        toast.success(
-          <div className="flex flex-col space-y-1">
-            <b>📱 SMS Sent!</b>
-            <span className="text-xs">Message ID: {data.messageId}</span>
-          </div>,
-          { duration: 5000 }
-        );
-      } else if (res.status === 429) {
-        toast.error(`Cooldown active. Please wait ${data.remainingSeconds} seconds before dispatching again.`);
-      } else {
-        toast.error(data.error || "Dispatch failed");
-      }
-    } catch {
-      toast.error("Network error during dispatch");
+      const shouldIncludeCoords = result?.flood_detected && (result?.v_pooling || 0) >= 0.70;
+      const coordsString = shouldIncludeCoords && geotag
+        ? ` [GPS: ${geotag.latitude.toFixed(6)}, ${geotag.longitude.toFixed(6)}]`
+        : "";
+      const mapLink = shouldIncludeCoords && geotag
+        ? `\nMap: https://www.openstreetmap.org/?mlat=${geotag.latitude}&mlon=${geotag.longitude}`
+        : "";
+
+      await dispatchUnit(
+        4,
+        "DTU Main Gate",
+        result?.v_pooling || 0.92,
+        "Dispatch Hydro-Jet" + coordsString,
+        { roadVerified: true, screenDetected: false }
+      );
+
+      setSmsPreview(
+        `[CRITICAL ALERT - FLOODGUARD AI]\nNode: #4 (DTU Main Gate Intersection)\nRisk Score: ${(
+          result?.v_pooling || 0.92
+        ).toFixed(2)} | Drain Status: App Dispatch\nRec. Action: Dispatch Hydro-Jet Truck to Clear Ingress Grate.${mapLink}`
+      );
+      toast.success("Alert dispatched via SNS");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to dispatch alert";
+      setResult((prev) => ({ ...(prev || {}), dispatchError: msg }));
+      toast.error(msg);
     } finally {
       setDispatching(false);
     }
   };
 
+  const openMap = () => {
+    if (geotag) {
+      window.open(
+        `https://www.openstreetmap.org/?mlat=${geotag.latitude}&mlon=${geotag.longitude}#map=18/${geotag.latitude}/${geotag.longitude}`,
+        "_blank"
+      );
+    }
+  };
+
   return (
-    <div className="min-h-[100dvh] bg-neutral-950 flex flex-col items-center justify-center p-4 py-16 pt-safe pb-safe pl-safe pr-safe">
-      <Link href="/" className="absolute top-8 left-8 text-neutral-500 hover:text-white pt-safe pl-safe">
-        &larr; Back to Home
-      </Link>
-      
-      <div className="max-w-xl w-full">
-        <h1 className="text-3xl font-bold mb-2 text-center">Live Rekognition Test</h1>
-        <p className="text-neutral-400 text-center mb-8">
-          Upload a CCTV frame to test the Visual Perception Engine.
+    <MobileShell>
+      <div className="flex flex-col flex-1 p-4 pb-8">
+        <h1 className="text-[24px] font-semibold text-white tracking-[-0.8px] mb-1">
+          Live Field Capture
+        </h1>
+        <p className="text-[14px] text-[#999999] tracking-[-0.15px] mb-5">
+          Capture a geotagged photo to analyze flood risk via Amazon Rekognition.
         </p>
 
-        <div className="bg-neutral-900 border border-white/10 rounded-2xl p-8 mb-8 flex flex-col items-center justify-center text-center">
-          <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" ref={fileInputRef} onChange={handleFileChange} />
-          
-          <div 
-            ref={dropzoneRef}
-            className="w-full aspect-video relative bg-neutral-800 rounded-lg border-2 border-dashed border-neutral-700 flex items-center justify-center mb-6 cursor-pointer hover:border-neutral-500 transition-colors overflow-hidden" 
-            onClick={() => fileInputRef.current?.click()}
-          >
-            {imageSrc ? (
-              <>
-                <img src={imageSrc} alt="Uploaded" className="object-cover w-full h-full opacity-50" />
-                {analyzing && (
-                  <div className="absolute inset-0 bg-neutral-900/60 backdrop-blur-sm flex flex-col items-center justify-center z-10 text-cyan-400">
-                    <UploadCloud className="w-8 h-8 mb-2 animate-bounce" />
-                    <span className="font-bold animate-pulse text-sm">Analyzing with Amazon Rekognition...</span>
-                  </div>
-                )}
-                {result?.labels.flatMap(l => l.Instances?.map((inst, i) => {
-                  const box = inst.BoundingBox;
-                  if (!box) return null;
-                  
-                  const isPriority = priorityLabels.includes(l.Name);
-                  if (!showAllLabels && !isPriority) return null;
+        {/* Location or Camera Error Card */}
+        {locationError && (
+          <div className="bg-[#ef4444]/10 border border-[#ef4444]/30 rounded-[20px] p-4 flex flex-col items-center text-center mb-4">
+            <AlertTriangle className="w-6 h-6 text-[#ef4444] mb-2" />
+            <p className="text-[#f87171] font-medium text-xs mb-3">{locationError}</p>
+            <button
+              onClick={() => setLocationError(null)}
+              className="w-full bg-[#1c1c1c] text-white py-2.5 rounded-full text-xs font-semibold hover:bg-[#262626] transition"
+            >
+              Try again
+            </button>
+          </div>
+        )}
 
-                  const dropzoneWidth = dropzoneRef.current?.clientWidth || 500;
-                  const isTooSmall = (box.Width * dropzoneWidth) < 40;
-                  const nearTop = box.Top < 0.1;
+        {/* Viewfinder when capturing */}
+        {!imageUri && (
+          <div className="flex flex-col gap-4">
+            <div className="w-full aspect-[3/4] bg-[#141414] rounded-[20px] border border-[#262626] overflow-hidden relative flex flex-col items-center justify-center shadow-lg">
+              {cameraError ? (
+                <div className="p-4 text-center">
+                  <AlertTriangle className="w-8 h-8 text-[#ef4444] mx-auto mb-2" />
+                  <p className="text-xs text-[#999999] mb-3">{cameraError}</p>
+                  <button
+                    onClick={() => setImageUri(null)}
+                    className="px-4 py-2 bg-[#1c1c1c] text-white rounded-full text-xs border border-[#262626]"
+                  >
+                    Retry Camera
+                  </button>
+                </div>
+              ) : (
+                <video
+                  ref={videoRef}
+                  playsInline
+                  autoPlay
+                  muted
+                  className="w-full h-full object-cover"
+                />
+              )}
+            </div>
 
-                  return (
-                    <div 
-                      key={`${l.Name}-${i}`}
-                      className="absolute border-2 border-cyan-500 bg-cyan-500/20"
-                      style={{
-                        left: `${box.Left * 100}%`,
-                        top: `${box.Top * 100}%`,
-                        width: `${box.Width * 100}%`,
-                        height: `${box.Height * 100}%`
-                      }}
-                    >
-                      {!isTooSmall && (
-                        <span 
-                          className={`absolute left-0 bg-cyan-500 text-black text-[10px] font-bold px-1 whitespace-nowrap ${nearTop ? 'top-0' : '-top-5'}`}
-                        >
-                          {l.Name}
-                        </span>
-                      )}
-                    </div>
-                  );
-                }))}
-              </>
-            ) : (
-              <div className="flex flex-col items-center">
-                <UploadCloud className="w-8 h-8 text-neutral-500 mb-2" />
-                <span className="text-sm text-neutral-400">Click to upload image</span>
+            <button
+              onClick={capturePhoto}
+              className="w-full bg-white text-black rounded-full py-4 px-6 flex flex-col items-center justify-center hover:bg-neutral-200 transition-all active:scale-[0.98] min-h-[72px] shadow-lg"
+            >
+              <div className="flex items-center gap-2 font-bold text-[17px] tracking-[-0.5px]">
+                <Camera className="w-5 h-5 text-black" />
+                <span>Capture Field Image</span>
+              </div>
+              <span className="text-[11px] text-[#404040] mt-0.5">
+                High-accuracy GPS required
+              </span>
+            </button>
+          </div>
+        )}
+
+        {/* Display Captured Image & Overlays */}
+        {imageUri && (
+          <div className="w-full aspect-[3/4] bg-[#141414] rounded-[20px] border border-[#262626] overflow-hidden relative mb-5 shadow-lg">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={imageUri}
+              alt="Field capture"
+              className="w-full h-full object-cover"
+            />
+
+            {analyzing && (
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center z-20">
+                <Loader2 className="w-8 h-8 text-white animate-spin mb-2" />
+                <span className="text-white font-bold text-xs">
+                  Analyzing with Amazon Rekognition...
+                </span>
               </div>
             )}
-          </div>
-          
-          {result && result.error && (
-            <div className="w-full mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-lg flex flex-col items-center gap-3">
-              <span className="text-red-400 font-bold">{result.error}</span>
-              <button 
-                onClick={() => { setImageSrc(null); setResult(null); }}
-                className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white text-sm rounded-md transition-colors"
-              >
-                Try again
-              </button>
-            </div>
-          )}
 
-          {result && !result.error && (
-            <div className="w-full text-left space-y-4 mt-4">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2 text-green-500">
-                  <CheckCircle2 className="w-5 h-5" />
-                  <span>Analysis Complete</span>
+            {/* Bounding Boxes */}
+            {result?.labels?.map((l, i) => {
+              if (!l.Instances) return null;
+              const isPriority = FLOOD_PRIORITY_SET.has(
+                (l.Name || l.name || "").toLowerCase().trim()
+              );
+              if (!showAllLabels && !isPriority) return null;
+
+              return l.Instances.map((inst, idx) => {
+                const box = inst.BoundingBox;
+                if (!box) return null;
+                const top = Math.max(0, box.Top * 100);
+                const left = Math.max(0, box.Left * 100);
+                const width = Math.min(100 - left, box.Width * 100);
+                const height = Math.min(100 - top, box.Height * 100);
+
+                return (
+                  <div
+                    key={`${i}-${idx}`}
+                    className="absolute border-2 border-[#0099ff] bg-[#0099ff]/20 z-10 pointer-events-none"
+                    style={{
+                      top: `${top}%`,
+                      left: `${left}%`,
+                      width: `${width}%`,
+                      height: `${height}%`,
+                    }}
+                  >
+                    <span className="absolute -top-5 left-0 bg-[#0099ff] text-white text-[10px] font-bold px-1 whitespace-nowrap">
+                      {l.Name || l.name}
+                    </span>
+                  </div>
+                );
+              });
+            })}
+          </div>
+        )}
+
+        {/* Analysis Results View */}
+        {result && !result.error && geotag && (() => {
+          const alertEligibility = getAlertEligibility();
+          const isDispatchDisabled = dispatching || !alertEligibility.canSend;
+
+          return (
+            <div className="flex flex-col gap-3">
+              {/* Invalid Card */}
+              {validation && !validation.valid && (
+                <div className="bg-[#ef4444]/10 border border-[#ef4444]/30 rounded-[20px] p-4 flex flex-col items-center text-center">
+                  <AlertTriangle className="w-6 h-6 text-[#ef4444] mb-1" />
+                  <h3 className="font-bold text-[15px] text-[#ef4444] mb-1">
+                    Image Rejected
+                  </h3>
+                  <p className="text-[12px] text-[#fca5a5] leading-relaxed mb-3">
+                    {validation.reason}
+                  </p>
+                  {SHOW_DEBUG_LABELS && result?.labels && result.labels.length > 0 && (
+                    <p className="text-[11px] text-[#999999] mb-3">
+                      Detected:{" "}
+                      {getTopDisplayLabels(result.labels)
+                        .map(
+                          (l) =>
+                            `${l.Name ?? l.name} ${Math.round(
+                              l.Confidence ?? l.confidence ?? 0
+                            )}%`
+                        )
+                        .join(", ")}
+                    </p>
+                  )}
+                  <button
+                    onClick={() => setImageUri(null)}
+                    className="w-full bg-[#ef4444] text-white py-2.5 rounded-full font-bold text-xs"
+                  >
+                    Retake photo
+                  </button>
                 </div>
+              )}
+
+              {/* Status Header */}
+              <div className="flex items-center justify-between py-1">
                 <div className="flex items-center gap-2">
-                  <label className="text-xs text-neutral-400 flex items-center gap-1 cursor-pointer select-none">
-                    <input 
-                      type="checkbox" 
-                      checked={showAllLabels} 
-                      onChange={e => setShowAllLabels(e.target.checked)}
-                      className="accent-cyan-500"
-                    />
-                    Show all bounding boxes
-                  </label>
+                  <CheckCircle className="w-5 h-5 text-[#22c55e]" />
+                  <span className="text-[13px] text-white font-medium">
+                    Analysis Complete
+                  </span>
+                  {validation?.valid && (
+                    <span className="bg-[#22c55e]/15 border border-[#22c55e]/30 text-[#4ade80] text-[11px] font-bold px-2 py-0.5 rounded-full">
+                      Road verified ({validation.roadConfidence}%)
+                    </span>
+                  )}
                 </div>
+                <button
+                  onClick={() => setShowAllLabels(!showAllLabels)}
+                  className="text-[12px] text-[#999999] hover:text-white"
+                >
+                  Toggle all boxes
+                </button>
               </div>
-              
-              <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-2 custom-scrollbar">
-                {result.labels.map((l, i) => {
-                  const isPriority = priorityLabels.includes(l.Name);
+
+              {/* Geotag Card */}
+              <div className="bg-[#141414] border border-[#262626] rounded-[20px] p-4 flex flex-col gap-2">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-2.5">
+                    <MapPin className="w-5 h-5 text-[#999999] shrink-0 mt-0.5" />
+                    <div>
+                      <span className="text-[11px] text-[#999999] block">
+                        Browser GPS Location
+                      </span>
+                      <span className="font-mono text-[14px] text-white block mt-0.5">
+                        {geotag.latitude.toFixed(6)}, {geotag.longitude.toFixed(6)}
+                      </span>
+                      <span className="text-[10px] text-[#999999] block mt-0.5">
+                        Accuracy: {Math.round(geotag.accuracyMeters)}m ·{" "}
+                        {new Date(geotag.capturedAt).toLocaleTimeString()}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="bg-[#22c55e]/15 text-[#4ade80] text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    Verified
+                  </span>
+                </div>
+                <button
+                  onClick={openMap}
+                  className="text-left text-[#0099ff] text-[11px] font-bold hover:underline mt-1"
+                >
+                  View on OpenStreetMap →
+                </button>
+              </div>
+
+              {/* Top 4 Display Labels */}
+              <div className="flex flex-col gap-2">
+                {getTopDisplayLabels(result.labels).map((l, i) => {
+                  const name = l.Name || l.name || "";
+                  const conf =
+                    typeof l.Confidence === "number"
+                      ? l.Confidence
+                      : typeof l.confidence === "number"
+                      ? l.confidence
+                      : 0;
+                  const isPriority = FLOOD_PRIORITY_SET.has(name.toLowerCase().trim());
+
                   return (
-                    <div key={i} className="flex flex-col bg-neutral-950 p-3 rounded border border-white/5 space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className={isPriority ? "text-cyan-400 font-bold" : "text-neutral-300"}>{l.Name}</span>
-                        <span className="font-mono text-sm">{l.Confidence.toFixed(1)}%</span>
+                    <div
+                      key={i}
+                      className="bg-[#141414] border border-[#262626] rounded-[15px] p-3 flex flex-col gap-1.5"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span
+                          className={`text-[13px] ${
+                            isPriority ? "font-bold text-white" : "text-[#999999]"
+                          }`}
+                        >
+                          {name}
+                        </span>
+                        <span className="font-mono text-[13px] text-[#999999]">
+                          {Number(conf).toFixed(1)}%
+                        </span>
                       </div>
-                      <div className="w-full bg-neutral-900 rounded-full h-1.5 overflow-hidden">
-                        <div className={`h-full ${isPriority ? "bg-cyan-500" : "bg-neutral-600"}`} style={{ width: `${l.Confidence}%` }} />
+                      <div className="w-full bg-[#1c1c1c] rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className={`h-full ${
+                            isPriority ? "bg-white" : "bg-[#999999]"
+                          }`}
+                          style={{
+                            width: `${Math.min(100, Math.max(0, conf))}%`,
+                          }}
+                        />
                       </div>
                     </div>
                   );
                 })}
               </div>
-              
-              <div className="mt-4 p-4 bg-orange-500/10 border border-orange-500/20 rounded-lg flex flex-col gap-1">
-                <div className="flex justify-between items-center">
-                  <span className="text-orange-500">Calculated V_pooling:</span>
-                  <span className="font-mono text-xl font-bold text-orange-400">{result.vPooling}</span>
-                </div>
-                <div className="text-xs text-orange-500/80 mt-1">
-                  Reason: {result.reason || (result.floodDetected ? "Water/Flood keyword detected" : "No water/flood keywords detected")}
-                </div>
-              </div>
-              <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg flex justify-between items-center">
-                <span className="text-blue-500">Flood Verdict:</span>
-                <span className="font-bold text-blue-400">{result.vPooling > 0.5 ? "FLOOD DETECTED" : "CLEAR"}</span>
-              </div>
-              {result.screenDetected && (
-                <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
-                  ⚠️ Image detected as a screen or device. Alert dispatch is disabled.
+
+              {/* V_pooling Score Card */}
+              {validation?.valid && (
+                <div className="bg-[#141414] border border-[#262626] rounded-[20px] p-4 flex flex-col gap-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[13px] text-[#fb923c] font-medium">
+                      Calculated V_pooling:
+                    </span>
+                    <span className="font-mono font-bold text-[20px] text-[#fb923c]">
+                      {result.v_pooling || 0}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-[#999999] leading-tight">
+                    Reason:{" "}
+                    {result.reason ||
+                      (result.flood_detected
+                        ? "Water/Flood keyword detected"
+                        : "No water/flood keywords detected")}
+                  </span>
                 </div>
               )}
-            </div>
-          )}
-        </div>
 
-        {result && !result.error && (
-           <HoverBorderGradient
-           containerClassName="w-full rounded-xl"
-           as="button"
-           className={`w-full text-white flex justify-center py-4 ${result.screenDetected ? "bg-neutral-900/50 opacity-50 cursor-not-allowed" : "bg-neutral-900"}`}
-           onClick={dispatching || result.screenDetected ? undefined : handleDispatch}
-         >
-           <span className="flex items-center gap-2">
-             <AlertCircle className="w-5 h-5" /> {dispatching ? "Sending..." : "Send Test SMS via SNS"}
-           </span>
-         </HoverBorderGradient>
-        )}
+              {/* Send Test Alert Button */}
+              <button
+                onClick={handleDispatch}
+                disabled={isDispatchDisabled}
+                className={`w-full py-3.5 px-4 rounded-full flex items-center justify-center gap-2 font-bold text-sm transition-all min-h-[44px] ${
+                  isDispatchDisabled
+                    ? "bg-[#141414] border border-[#262626] text-[#666666] opacity-60 cursor-not-allowed"
+                    : "bg-[#7f1d1d] border border-[#ef4444] text-[#fca5a5] hover:bg-[#991b1b] active:scale-[0.98]"
+                }`}
+              >
+                <Activity className="w-4 h-4" />
+                <span>
+                  {dispatching ? "Sending..." : "Send Test Alert via SNS"}
+                </span>
+              </button>
+
+              {!alertEligibility.canSend && (
+                <p className="text-[11px] text-[#999999] text-center px-4">
+                  {alertEligibility.reason}
+                </p>
+              )}
+
+              {/* SMS Preview Card */}
+              {smsPreview && (
+                <div className="bg-[#141414] border border-[#262626] rounded-[15px] p-4 text-[12px] font-mono text-white whitespace-pre-wrap">
+                  {smsPreview}
+                </div>
+              )}
+
+              {/* Retake Button */}
+              <button
+                onClick={() => setImageUri(null)}
+                className="w-full bg-[#1c1c1c] text-white py-3 rounded-full text-xs font-semibold hover:bg-[#262626] transition min-h-[44px] mt-2"
+              >
+                Capture Another Image
+              </button>
+            </div>
+          );
+        })()}
       </div>
-    </div>
+    </MobileShell>
   );
 }

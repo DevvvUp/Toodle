@@ -23,16 +23,37 @@ export interface WeatherData {
   precipProbMax: number;
 }
 
+export interface FieldReport {
+  id: string;
+  uri: string;
+  lat: number;
+  lng: number;
+  verdict: string;
+  vPooling: number;
+  timestamp: string;
+  floodDetected: boolean;
+  accuracy: number;
+  mocked: boolean;
+}
+
 interface SimulatorState {
   preset: Preset;
   isPlaying: boolean;
   nodes: EvaluatedNode[];
   liveMode: boolean;
+  liveWeatherMode: boolean;
+  rainMmH: number;
+  chokeMultiplier: number;
+  fieldReports: FieldReport[];
   weatherData: Record<string, WeatherData>;
   setPreset: (preset: Preset) => void;
   togglePlay: () => void;
   tick: () => void;
   setLiveMode: (live: boolean) => void;
+  setLiveWeatherMode: (live: boolean) => void;
+  setRainMmH: (rain: number) => void;
+  setChokeMultiplier: (mult: number) => void;
+  addFieldReport: (report: FieldReport) => void;
   updateWeatherData: (data: WeatherData[]) => void;
 }
 
@@ -65,6 +86,10 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => ({
   preset: "CLEAR",
   isPlaying: false,
   liveMode: false,
+  liveWeatherMode: false,
+  rainMmH: 0,
+  chokeMultiplier: 1.0,
+  fieldReports: [],
   weatherData: {},
   nodes: evaluateNodes("CLEAR", false, {}),
   setPreset: (preset) => {
@@ -90,6 +115,10 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => ({
     const { preset, weatherData } = get();
     set({ liveMode, nodes: evaluateNodes(preset, liveMode, weatherData) });
   },
+  setLiveWeatherMode: (liveWeatherMode) => set({ liveWeatherMode }),
+  setRainMmH: (rainMmH) => set({ rainMmH }),
+  setChokeMultiplier: (chokeMultiplier) => set({ chokeMultiplier }),
+  addFieldReport: (report) => set((state) => ({ fieldReports: [report, ...state.fieldReports] })),
   updateWeatherData: (data) => {
     const { preset, liveMode } = get();
     const weatherData = data.reduce((acc, curr) => ({ ...acc, [curr.nodeId]: curr }), {} as Record<string, WeatherData>);

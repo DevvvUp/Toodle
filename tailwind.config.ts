@@ -16,6 +16,40 @@ const config: Config = {
     extend: {
       colors: {
         neutral: colors.neutral,
+        canvas: "#090909",
+        surface1: "#141414",
+        surface2: "#1c1c1c",
+        hairline: "#262626",
+        hairlineSoft: "#1a1a1a",
+        ink: "#ffffff",
+        inkMuted: "#999999",
+        accentBlue: "#0099ff",
+        riskCritical: "#ef4444",
+        riskCriticalBg: "rgba(239, 68, 68, 0.1)",
+        riskCriticalBorder: "rgba(239, 68, 68, 0.3)",
+        riskCriticalDarkBg: "#7f1d1d",
+        riskCriticalDarkText: "#fca5a5",
+        riskWarning: "#f59e0b",
+        riskWarningOrange: "#fb923c",
+        riskWarningBg: "rgba(249, 115, 22, 0.1)",
+        riskWarningBorder: "rgba(249, 115, 22, 0.2)",
+        riskNormal: "#22c55e",
+        riskNormalLight: "#4ade80",
+        riskNormalBg: "rgba(34, 197, 94, 0.15)",
+        riskNormalBorder: "rgba(34, 197, 94, 0.3)",
+      },
+      fontFamily: {
+        sans: ["var(--font-inter)", ...defaultTheme.fontFamily.sans],
+        mono: ["var(--font-fira-code)", ...defaultTheme.fontFamily.mono],
+      },
+      borderRadius: {
+        xs: "4px",
+        sm: "6px",
+        md: "10px",
+        lg: "15px",
+        xl: "20px",
+        "2xl": "30px",
+        pill: "100px",
       },
       animation: {
         spotlight: "spotlight 2s ease .75s 1 forwards",
@@ -82,7 +116,6 @@ const config: Config = {
   plugins: [addVariablesForColors],
 };
 
-// This plugin adds each Tailwind color as a global CSS variable, e.g. var(--gray-200).
 function addVariablesForColors({ addBase, theme }: any) {
   let allColors = flattenColorPalette(theme("colors"));
   let newVars = Object.fromEntries(
