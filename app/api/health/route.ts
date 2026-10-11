@@ -42,6 +42,8 @@ function formatLiveCheckError(err: unknown): LiveCheckError {
       (typeof e.message === "string" && (e.message.includes("ResourceNotFound") || e.message.includes("not found")))
     ) {
       code = "ResourceNotFoundException";
+    } else if (typeof e.message === "string" && e.message.includes("Region not accepted")) {
+      code = "InvalidRegionError";
     } else if (typeof e.name === "string" && /^[A-Za-z0-9_]+$/.test(e.name) && e.name !== "Error") {
       code = e.name;
     } else if (typeof e.code === "string" && /^[A-Za-z0-9_]+$/.test(e.code)) {
@@ -58,6 +60,8 @@ function formatLiveCheckError(err: unknown): LiveCheckError {
     hint = "Table or topic not found in this region";
   } else if (code === "TimeoutError") {
     hint = "Request timed out: check network connectivity and region";
+  } else if (code === "InvalidRegionError") {
+    hint = "APP_AWS_REGION is invalid (ensure it is ap-south-1 without leading tabs or whitespace)";
   }
 
   return {

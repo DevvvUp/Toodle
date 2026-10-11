@@ -6,7 +6,7 @@ import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 export const STUB_MODE = false;
 
 export const AWS_REGION =
-  process.env.APP_AWS_REGION || process.env.AWS_REGION || "ap-south-1";
+  (process.env.APP_AWS_REGION?.trim() || process.env.AWS_REGION?.trim() || "ap-south-1");
 
 function getClientConfig() {
   const region = AWS_REGION;
