@@ -5,19 +5,24 @@ import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 
 export const STUB_MODE = false;
 
+export const AWS_REGION =
+  process.env.APP_AWS_REGION || process.env.AWS_REGION || "ap-south-1";
+
 function getClientConfig() {
-  const region = process.env.APP_AWS_REGION || process.env.AWS_REGION || "ap-south-1";
-  
-  if (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) {
+  const region = AWS_REGION;
+  const accessKeyId = process.env.AWS_ACCESS_KEY_ID?.trim();
+  const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY?.trim();
+
+  if (accessKeyId && secretAccessKey) {
     return {
       region,
       credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+        accessKeyId,
+        secretAccessKey,
       },
     };
   }
-  
+
   return { region };
 }
 
@@ -27,4 +32,8 @@ export const rekognitionClient = new RekognitionClient(config);
 export const snsClient = new SNSClient(config);
 export const dynamoDbClient = DynamoDBDocumentClient.from(new DynamoDBClient(config));
 
-export const getCredentialSource = () => (process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY) ? "env-keys" : "default-chain";
+export const getCredentialSource = () => {
+  const accessKeyId = process.env.AWS_ACCESS_KEY_ID?.trim();
+  const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY?.trim();
+  return accessKeyId && secretAccessKey ? "env-keys" : "default-chain";
+};
