@@ -12,12 +12,34 @@ export function getAwsRegion(): string {
 
 export const AWS_REGION = getAwsRegion();
 
+export type CredentialSource = "app-keys" | "env-keys" | "default-chain";
+
+export const getCredentialSource = (): CredentialSource => {
+  const appKeyId = process.env.APP_ACCESS_KEY_ID?.trim();
+  const appSecret = process.env.APP_SECRET_ACCESS_KEY?.trim();
+  if (appKeyId && appSecret) {
+    return "app-keys";
+  }
+
+  const awsKeyId = process.env.AWS_ACCESS_KEY_ID?.trim();
+  const awsSecret = process.env.AWS_SECRET_ACCESS_KEY?.trim();
+  const awsSessionToken = process.env.AWS_SESSION_TOKEN?.trim();
+  const isProduction = process.env.NODE_ENV === "production";
+
+  if (awsKeyId && awsSecret && !awsSessionToken && !isProduction) {
+    return "env-keys";
+  }
+
+  return "default-chain";
+};
+
 export function getClientConfig() {
   const region = getAwsRegion();
-  const accessKeyId = process.env.AWS_ACCESS_KEY_ID?.trim();
-  const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY?.trim();
+  const source = getCredentialSource();
 
-  if (accessKeyId && secretAccessKey) {
+  if (source === "app-keys") {
+    const accessKeyId = process.env.APP_ACCESS_KEY_ID!.trim();
+    const secretAccessKey = process.env.APP_SECRET_ACCESS_KEY!.trim();
     return {
       region,
       credentials: {
@@ -27,6 +49,19 @@ export function getClientConfig() {
     };
   }
 
+  if (source === "env-keys") {
+    const accessKeyId = process.env.AWS_ACCESS_KEY_ID!.trim();
+    const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY!.trim();
+    return {
+      region,
+      credentials: {
+        accessKeyId,
+        secretAccessKey,
+      },
+    };
+  }
+
+  // "default-chain": create client without any "credentials" property
   return { region };
 }
 
@@ -78,9 +113,3 @@ export const stsClient = new Proxy({} as STSClient, {
     return typeof val === "function" ? val.bind(client) : val;
   },
 });
-
-export const getCredentialSource = () => {
-  const accessKeyId = process.env.AWS_ACCESS_KEY_ID?.trim();
-  const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY?.trim();
-  return accessKeyId && secretAccessKey ? "env-keys" : "default-chain";
-};

@@ -84,11 +84,13 @@ export async function GET() {
   const snsTopic = process.env.SNS_TOPIC_ARN?.trim();
   const appAwsRegion = process.env.APP_AWS_REGION?.trim();
   const activeRegion = getAwsRegion();
+  const hasSessionToken = !!process.env.AWS_SESSION_TOKEN?.trim();
 
   const envVars = {
     DDB_TABLE: !!ddbTable,
     SNS_TOPIC_ARN: !!snsTopic,
     APP_AWS_REGION: !!appAwsRegion,
+    AWS_SESSION_TOKEN: hasSessionToken,
   };
 
   const resolved = {
@@ -166,6 +168,7 @@ export async function GET() {
       resolved,
       envVars,
       credentialSource,
+      awsSessionToken: hasSessionToken,
       liveChecks: {
         dynamoDb: ddbStatus,
         sns: snsStatus,
