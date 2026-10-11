@@ -11,6 +11,8 @@ interface AnalysisResult {
   vPooling: number;
   floodDetected?: boolean;
   reason?: string;
+  roadVerified?: boolean;
+  screenDetected?: boolean;
 }
 
 export default function DemoPage() {
@@ -83,7 +85,9 @@ export default function DemoPage() {
                 labels: sortedLabels,
                 vPooling: data.v_pooling,
                 floodDetected: data.flood_detected,
-                reason: data.reason
+                reason: data.reason,
+                roadVerified: data.roadVerified,
+                screenDetected: data.screenDetected
               });
             }
           } catch (err: unknown) {
@@ -101,6 +105,10 @@ export default function DemoPage() {
   };
 
   const handleDispatch = async () => {
+    if (result?.screenDetected) {
+      toast.error("Image detected as a screen. Dispatch is disabled.");
+      return;
+    }
     setDispatching(true);
     try {
       const res = await fetch("/api/dispatch", {
@@ -111,7 +119,8 @@ export default function DemoPage() {
           nodeName: "DTU Main Gate", 
           fri: 0.92, 
           drainStatus: "Simulated Choke", 
-          action: "Dispatch Response Unit" 
+          action: "Dispatch Response Unit",
+          screenDetected: result?.screenDetected
         })
       });
       const data = await res.json();
@@ -267,6 +276,11 @@ export default function DemoPage() {
                 <span className="text-blue-500">Flood Verdict:</span>
                 <span className="font-bold text-blue-400">{result.vPooling > 0.5 ? "FLOOD DETECTED" : "CLEAR"}</span>
               </div>
+              {result.screenDetected && (
+                <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
+                  ⚠️ Image detected as a screen or device. Alert dispatch is disabled.
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -275,8 +289,8 @@ export default function DemoPage() {
            <HoverBorderGradient
            containerClassName="w-full rounded-xl"
            as="button"
-           className="bg-neutral-900 w-full text-white flex justify-center py-4"
-           onClick={handleDispatch}
+           className={`w-full text-white flex justify-center py-4 ${result.screenDetected ? "bg-neutral-900/50 opacity-50 cursor-not-allowed" : "bg-neutral-900"}`}
+           onClick={dispatching || result.screenDetected ? undefined : handleDispatch}
          >
            <span className="flex items-center gap-2">
              <AlertCircle className="w-5 h-5" /> {dispatching ? "Sending..." : "Send Test SMS via SNS"}
