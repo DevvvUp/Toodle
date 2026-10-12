@@ -187,10 +187,17 @@ export async function dispatchUnit(
   nodeName: string,
   fri: number,
   action: string,
-  metadata?: { roadVerified?: boolean; screenDetected?: boolean }
+  metadata?: { roadVerified?: boolean; screenDetected?: boolean; drainStatus?: string; blockageDetected?: boolean }
 ) {
   try {
-    const payload: Record<string, unknown> = { nodeId, nodeName, fri, action, drainStatus: 'App Dispatch' };
+    const payload: Record<string, unknown> = {
+      nodeId,
+      nodeName,
+      fri,
+      action,
+      drainStatus: metadata?.drainStatus || 'App Dispatch',
+      ...(metadata?.blockageDetected ? { blockageDetected: true } : {})
+    };
     if (metadata && typeof metadata.roadVerified === 'boolean') {
       payload.roadVerified = metadata.roadVerified;
     }

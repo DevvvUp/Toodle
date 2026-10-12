@@ -5,6 +5,7 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 import { DetectLabelsCommand } from "@aws-sdk/client-rekognition";
 import { getRekognitionClient } from "@/lib/aws-config";
+import { validateRoadImage } from "@/lib/imageValidation";
 
 export async function POST(req: Request) {
   try {
@@ -38,53 +39,9 @@ export async function POST(req: Request) {
       );
       const v_pooling = isWater ? 0.85 : 0.05;
 
-      const SCREEN_LABELS = new Set([
-        'monitor', 'screen', 'lcd screen', 'display', 'television', 'tv', 'laptop', 'computer', 'pc', 'tablet computer'
-      ]);
-      const ROAD_LABELS = new Set([
-        'road', 'street', 'asphalt', 'tarmac', 'intersection', 'highway', 'freeway', 'path', 'zebra crossing',
-        'alleyway', 'pavement', 'sidewalk', 'parking lot', 'urban', 'city', 'downtown', 'neighborhood',
-        'car', 'vehicle', 'flood', 'flash flood'
-      ]);
-      const PRIMARY_ROAD_LABELS = new Set([
-        'road', 'street', 'asphalt', 'tarmac', 'intersection', 'highway', 'freeway', 'pavement', 'zebra crossing'
-      ]);
-      const CONTEXT_LABELS = new Set([
-        'car', 'vehicle', 'person', 'urban', 'city', 'building', 'transportation'
-      ]);
-
-      let maxScreenConfidence = 0;
-      let maxRoadConfidence = 0;
-      let hasPrimaryRoadAt60 = false;
-      let maxFloodOrWater = 0;
-      let maxContext = 0;
-
-      for (const item of labels) {
-        const name = (item.Name || '').toLowerCase().trim();
-        const conf = typeof item.Confidence === 'number' ? item.Confidence : 0;
-
-        if (SCREEN_LABELS.has(name)) {
-          if (conf > maxScreenConfidence) maxScreenConfidence = conf;
-        }
-        if (ROAD_LABELS.has(name) || name === 'water') {
-          if (conf > maxRoadConfidence) maxRoadConfidence = conf;
-        }
-        if (PRIMARY_ROAD_LABELS.has(name) && conf >= 60) {
-          hasPrimaryRoadAt60 = true;
-        }
-        if ((name === 'flood' || name === 'water') && conf > maxFloodOrWater) {
-          maxFloodOrWater = conf;
-        }
-        if (CONTEXT_LABELS.has(name) && conf > maxContext) {
-          maxContext = conf;
-        }
-      }
-
-      const hasRoadAt70 = maxRoadConfidence >= 70;
-      const screenDetected = maxScreenConfidence >= 80 && !hasRoadAt70;
-      const floodContextPassed = maxFloodOrWater >= 70 && maxContext >= 60;
-      const isRoadScene = hasPrimaryRoadAt60 || floodContextPassed;
-      const roadVerified = isRoadScene && !screenDetected;
+      const validation = validateRoadImage(labels);
+      const roadVerified = validation.valid;
+      const screenDetected = !validation.valid && validation.screenConfidence >= 80 && validation.roadConfidence < 70;
 
       return NextResponse.json({ 
         success: true, 
@@ -92,7 +49,9 @@ export async function POST(req: Request) {
         v_pooling,
         flood_detected: isWater,
         roadVerified,
-        screenDetected
+        screenDetected,
+        blockageDetected: validation.blockageDetected,
+        blockageConfidence: validation.blockageConfidence
       });
     } catch (rekErr: unknown) {
       if (rekErr instanceof Error) {

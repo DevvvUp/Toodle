@@ -10,13 +10,14 @@ import { getSnsClient, getDynamoDbClient } from "@/lib/aws-config";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { nodeId, nodeName, fri, drainStatus, action, screenDetected } = body;
+    const { nodeId, nodeName, fri, drainStatus, action, screenDetected, blockageDetected } = body;
     
     if (screenDetected === true) {
       return NextResponse.json({ success: false, error: "Image not verified as a real road" }, { status: 400 });
     }
 
-    if (fri < 0.86) {
+    const isBlockage = blockageDetected === true || drainStatus === "Drain blockage detected (visual)";
+    if (fri < 0.86 && !isBlockage) {
       return NextResponse.json({ success: false, error: "FRI below critical threshold" }, { status: 400 });
     }
 

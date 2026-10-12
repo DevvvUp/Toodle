@@ -67,12 +67,14 @@ interface AnalysisResultData {
   labels?: LabelItem[];
   v_pooling?: number;
   flood_detected?: boolean;
+  blockageDetected?: boolean;
+  blockageConfidence?: number;
   reason?: string;
   error?: string;
   dispatchError?: string;
 }
 
-function getTopDisplayLabels(labels: LabelItem[] = []): LabelItem[] {
+function getTopDisplayLabels(labels: LabelItem[] = [], maxCount = MAX_LABELS_SHOWN): LabelItem[] {
   const safeLabels = Array.isArray(labels) ? labels : [];
 
   const sorted = [...safeLabels].sort((a, b) => {
@@ -96,7 +98,7 @@ function getTopDisplayLabels(labels: LabelItem[] = []): LabelItem[] {
     if (!key || seen.has(key)) continue;
     seen.add(key);
     top.push(item);
-    if (top.length >= MAX_LABELS_SHOWN) break;
+    if (top.length >= maxCount) break;
   }
 
   return top;
@@ -170,13 +172,15 @@ export default function DemoPage() {
 
   const getAlertEligibility = (): { canSend: boolean; reason: string } => {
     if (!validation || !validation.valid) {
-      return { canSend: false, reason: validation?.reason || "Image not verified as a real road" };
+      return { canSend: false, reason: validation?.reason || "Scene not verified" };
     }
-    if (!result?.flood_detected) {
-      return { canSend: false, reason: "No flood detected in image" };
-    }
-    if ((result?.v_pooling || 0) < 0.70) {
-      return { canSend: false, reason: "Flood risk (V_pooling) below critical threshold (0.70)" };
+    const isFlood = Boolean(result?.flood_detected && (result?.v_pooling || 0) >= 0.70);
+    const isBlockage = Boolean(validation?.blockageDetected || result?.blockageDetected);
+    if (!isFlood && !isBlockage) {
+      if (result?.flood_detected && (result?.v_pooling || 0) < 0.70) {
+        return { canSend: false, reason: "Flood risk (V_pooling) below critical threshold (0.70) and no blockage detected" };
+      }
+      return { canSend: false, reason: "Neither flood (≥0.70) nor drain blockage detected" };
     }
     if (!geotag) {
       return { canSend: false, reason: "GPS location required" };
@@ -341,7 +345,12 @@ export default function DemoPage() {
 
     setDispatching(true);
     try {
-      const shouldIncludeCoords = result?.flood_detected && (result?.v_pooling || 0) >= 0.70;
+      const isFlood = Boolean(result?.flood_detected && (result?.v_pooling || 0) >= 0.70);
+      const isBlockage = Boolean(validation?.blockageDetected || result?.blockageDetected);
+      const isBlockageOnly = isBlockage && !isFlood;
+      const drainStatus = isBlockageOnly ? "Drain blockage detected (visual)" : "App Dispatch";
+
+      const shouldIncludeCoords = isFlood || isBlockage;
       const coordsString = shouldIncludeCoords && geotag
         ? ` [GPS: ${geotag.latitude.toFixed(6)}, ${geotag.longitude.toFixed(6)}]`
         : "";
@@ -354,13 +363,13 @@ export default function DemoPage() {
         "DTU Main Gate",
         result?.v_pooling || 0.92,
         "Dispatch Hydro-Jet" + coordsString,
-        { roadVerified: true, screenDetected: false }
+        { roadVerified: true, screenDetected: false, drainStatus, blockageDetected: isBlockage }
       );
 
       setSmsPreview(
         `[CRITICAL ALERT - FLOODGUARD AI]\nNode: #4 (DTU Main Gate Intersection)\nRisk Score: ${(
           result?.v_pooling || 0.92
-        ).toFixed(2)} | Drain Status: App Dispatch\nRec. Action: Dispatch Hydro-Jet Truck to Clear Ingress Grate.${mapLink}`
+        ).toFixed(2)} | Drain Status: ${drainStatus}\nRec. Action: Dispatch Hydro-Jet Truck to Clear Ingress Grate.${mapLink}`
       );
       toast.success("Alert dispatched via SNS");
     } catch (err: unknown) {
@@ -522,7 +531,7 @@ export default function DemoPage() {
                   {SHOW_DEBUG_LABELS && result?.labels && result.labels.length > 0 && (
                     <p className="text-[11px] text-[#999999] mb-3">
                       Detected:{" "}
-                      {getTopDisplayLabels(result.labels)
+                      {getTopDisplayLabels(result.labels, 12)
                         .map(
                           (l) =>
                             `${l.Name ?? l.name} ${Math.round(
@@ -543,14 +552,14 @@ export default function DemoPage() {
 
               {/* Status Header */}
               <div className="flex items-center justify-between py-1">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <CheckCircle className="w-5 h-5 text-[#22c55e]" />
                   <span className="text-[13px] text-white font-medium">
                     Analysis Complete
                   </span>
                   {validation?.valid && (
                     <span className="bg-[#22c55e]/15 border border-[#22c55e]/30 text-[#4ade80] text-[11px] font-bold px-2 py-0.5 rounded-full">
-                      Road verified ({validation.roadConfidence}%)
+                      Scene verified ({validation.roadConfidence}%)
                     </span>
                   )}
                 </div>
@@ -560,6 +569,30 @@ export default function DemoPage() {
                 >
                   Toggle all boxes
                 </button>
+              </div>
+
+              {/* Two Verdict Pills */}
+              <div className="flex items-center gap-2 flex-wrap py-0.5">
+                <span
+                  className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                    result?.flood_detected
+                      ? "bg-[#ef4444]/15 border-[#ef4444]/40 text-[#f87171]"
+                      : "bg-[#1c1c1c] border-[#262626] text-[#999999]"
+                  }`}
+                >
+                  {result?.flood_detected ? "Flood detected" : "No flood"}
+                </span>
+                <span
+                  className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                    validation?.blockageDetected || result?.blockageDetected
+                      ? "bg-amber-500/15 border-amber-500/40 text-amber-400"
+                      : "bg-[#1c1c1c] border-[#262626] text-[#999999]"
+                  }`}
+                >
+                  {validation?.blockageDetected || result?.blockageDetected
+                    ? "Blockage detected"
+                    : "No blockage"}
+                </span>
               </div>
 
               {/* Geotag Card */}

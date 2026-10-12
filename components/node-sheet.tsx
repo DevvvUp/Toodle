@@ -2,6 +2,7 @@
 
 import React, { useMemo, useEffect } from "react";
 import { CalculatedNode } from "@/lib/api";
+import { WeatherData } from "@/lib/weather";
 import { X, Truck, Thermometer, CloudRain, Wind, Droplets } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -17,6 +18,7 @@ interface NodeSheetProps {
   node: CalculatedNode;
   chokeMultiplier: number;
   rainRate: number;
+  liveWeatherMode?: boolean;
   onClose: () => void;
   onDispatch: (node: CalculatedNode) => void;
   dispatching: boolean;
@@ -26,6 +28,7 @@ export function NodeSheet({
   node,
   chokeMultiplier,
   rainRate,
+  liveWeatherMode,
   onClose,
   onDispatch,
   dispatching,
@@ -233,7 +236,55 @@ export function NodeSheet({
       </div>
 
       {/* Local Weather Section */}
-      {node.localWeather && (
+      {liveWeatherMode ? (
+        node.localWeather ? (() => {
+          const lw = node.localWeather as Partial<WeatherData>;
+          const rainNow = Number(lw.rainMmH) || 0;
+          const last24h = Number(lw.last24hMm) || 0;
+          return (
+            <div className="bg-[#1c1c1c] p-3 rounded-[12px] border border-[#262626] flex flex-col gap-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-[#999999] uppercase font-bold tracking-wider">Local Weather</span>
+                {rainNow === 0 && last24h >= 1 ? (
+                  <span className="text-[11px] text-cyan-300 font-medium">
+                    Clear now, rain in the last 24h: {last24h} mm
+                  </span>
+                ) : rainNow === 0 ? (
+                  <span className="text-[11px] text-[#999999]">Clear</span>
+                ) : null}
+              </div>
+              <div className="flex items-center justify-around">
+                <div className="flex items-center gap-1.5 text-white">
+                  <Thermometer className="w-3.5 h-3.5 text-[#0099ff]" />
+                  <span className="font-mono">{lw.tempC ?? 28}°C</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-white">
+                  <CloudRain className="w-3.5 h-3.5 text-cyan-400" />
+                  <span className="font-mono">Rain now: {rainNow} mm/h</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-[#999999]">
+                  <Wind className="w-3.5 h-3.5" />
+                  <span className="font-mono">{lw.windKmh ?? 10} km/h</span>
+                </div>
+              </div>
+              <div className="flex items-center justify-around border-t border-[#262626]/60 pt-1.5 text-[#999999] text-[11px]">
+                <span>Last 3h: <strong className="text-white font-mono">{lw.last3hMm ?? 0} mm</strong></span>
+                <span>Last 24h: <strong className="text-white font-mono">{last24h} mm</strong></span>
+                {typeof lw.precipProbMax === "number" && (
+                  <span className="flex items-center gap-1 font-mono">
+                    <Droplets className="w-3 h-3 text-cyan-400" />
+                    {lw.precipProbMax}%
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })() : (
+          <div className="bg-[#1c1c1c] p-2.5 rounded-[12px] border border-[#262626] text-center">
+            <span className="text-[#666666] text-xs italic">Weather unavailable</span>
+          </div>
+        )
+      ) : node.localWeather ? (
         <div className="bg-[#1c1c1c] p-3 rounded-[12px] border border-[#262626] flex items-center justify-around text-xs">
           <div className="flex items-center gap-1.5 text-white">
             <Thermometer className="w-3.5 h-3.5 text-[#0099ff]" />
@@ -254,7 +305,7 @@ export function NodeSheet({
             </div>
           )}
         </div>
-      )}
+      ) : null}
 
       {/* Dispatch Action Button */}
       {node.id !== "user" && (

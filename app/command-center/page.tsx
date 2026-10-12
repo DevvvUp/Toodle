@@ -267,21 +267,19 @@ export default function CommandCenterPage() {
         }
 
         let currentRRate = 0;
-        let nodeWeather: Record<string, unknown> | null = null;
+        let nodeWeather: Partial<WeatherData & UserWeatherData> | null = null;
 
         if (liveWeatherMode && weatherData.length > 0) {
           const matchedWeather = weatherData.find((w) => String(w.nodeId) === String(n.id));
           nodeWeather = matchedWeather ? { ...matchedWeather } : null;
           if (userWeather && String(n.id) === String(nearestNodeId)) {
-            currentRRate = getRRateFromWeather(userWeather.rainMmH);
+            currentRRate = userWeather.rRate ?? getRRateFromWeather(userWeather.effectiveRainMmH ?? userWeather.rainMmH);
             nodeWeather = {
               ...(nodeWeather || {}),
-              rainMmH: userWeather.rainMmH,
-              tempC: userWeather.tempC,
-              windKmh: userWeather.windKmh,
+              ...userWeather,
             };
           } else {
-            currentRRate = getRRateFromWeather(Number(nodeWeather?.rainMmH) || 0);
+            currentRRate = nodeWeather?.rRate ?? getRRateFromWeather(Number(nodeWeather?.effectiveRainMmH ?? nodeWeather?.rainMmH) || 0);
           }
         } else {
           currentRRate = rainMmH > 30 ? 1.0 : rainMmH / 30;
@@ -521,7 +519,7 @@ export default function CommandCenterPage() {
                     const mockFri = calculateFRI(
                       nearest?.base_vPooling || 0.5,
                       nearest?.base_aImpedance || 0.5,
-                      userWeather ? getRRateFromWeather(userWeather.rainMmH) : 0
+                      userWeather ? (userWeather.rRate ?? getRRateFromWeather(userWeather.effectiveRainMmH ?? userWeather.rainMmH)) : 0
                     ).score;
 
                     setSelectedNode({
@@ -564,40 +562,59 @@ export default function CommandCenterPage() {
               />
 
               {/* Weather Overlay Card */}
-              {liveWeatherMode && (userWeather || topNodeWeather) && (() => {
-                const activeW = userWeather || topNodeWeather;
-                return (
-                  <div className="absolute top-3 left-3 bg-[#141414]/90 backdrop-blur-md rounded-[10px] p-2.5 border border-[#262626] z-[400] text-xs pointer-events-none shadow-lg">
-                    <span className="text-[10px] text-[#999999] block mb-1">
-                      {userWeather ? "Your location" : "Delhi NCR Default"}
-                    </span>
-                    <div className="flex items-center gap-1.5 text-white mb-0.5">
-                      <Thermometer className="w-3 h-3 text-[#0099ff]" />
-                      <span className="font-mono text-[11px]">
-                        {activeW?.tempC ?? 28}°C
+              {liveWeatherMode && (
+                (userWeather || topNodeWeather) ? (() => {
+                  const activeW = (userWeather || topNodeWeather) as Partial<WeatherData & UserWeatherData> | undefined;
+                  const rainNow = Number(activeW?.rainMmH) || 0;
+                  const last24h = Number(activeW?.last24hMm) || 0;
+                  return (
+                    <div className="absolute top-3 left-3 bg-[#141414]/90 backdrop-blur-md rounded-[10px] p-2.5 border border-[#262626] z-[400] text-xs pointer-events-none shadow-lg max-w-[240px]">
+                      <span className="text-[10px] text-[#999999] block mb-1">
+                        {userWeather ? "Your location" : "Delhi NCR Default"}
                       </span>
+                      {rainNow === 0 && last24h >= 1 ? (
+                        <div className="text-[10px] text-cyan-300 font-medium mb-1">
+                          Clear now, rain in the last 24h: {last24h} mm
+                        </div>
+                      ) : rainNow === 0 ? (
+                        <div className="text-[10px] text-[#999999] mb-1">Clear</div>
+                      ) : null}
+                      <div className="flex items-center gap-1.5 text-white mb-0.5">
+                        <Thermometer className="w-3 h-3 text-[#0099ff]" />
+                        <span className="font-mono text-[11px]">
+                          {activeW?.tempC ?? 28}°C
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-white mb-0.5">
+                        <CloudRain className="w-3 h-3 text-cyan-400" />
+                        <span className="font-mono text-[11px]">
+                          Rain now: {rainNow} mm/h
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-[#999999] mb-0.5 text-[10px]">
+                        <span>Last 3h: <span className="text-white font-mono">{activeW?.last3hMm ?? 0} mm</span></span>
+                        <span>Last 24h: <span className="text-white font-mono">{activeW?.last24hMm ?? 0} mm</span></span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[#999999] mb-0.5">
+                        <Wind className="w-3 h-3" />
+                        <span className="font-mono text-[10px]">
+                          {activeW?.windKmh ?? 10} km/h
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[#999999]">
+                        <Droplets className="w-3 h-3" />
+                        <span className="font-mono text-[10px]">
+                          {activeW?.precipProbMax ?? 0}% prob
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1.5 text-white mb-0.5">
-                      <CloudRain className="w-3 h-3 text-cyan-400" />
-                      <span className="font-mono text-[11px]">
-                        {activeW?.rainMmH ?? 0} mm/h
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[#999999] mb-0.5">
-                      <Wind className="w-3 h-3" />
-                      <span className="font-mono text-[10px]">
-                        {activeW?.windKmh ?? 10} km/h
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-[#999999]">
-                      <Droplets className="w-3 h-3" />
-                      <span className="font-mono text-[10px]">
-                        {activeW?.precipProbMax ?? 0}% prob
-                      </span>
-                    </div>
+                  );
+                })() : !weatherLoading ? (
+                  <div className="absolute top-3 left-3 bg-[#141414]/90 backdrop-blur-md rounded-[10px] p-2 border border-[#262626] z-[400] text-xs pointer-events-none shadow-lg">
+                    <span className="text-[#666666] text-[11px] italic">Weather unavailable</span>
                   </div>
-                );
-              })()}
+                ) : null
+              )}
             </div>
           </div>
 
@@ -702,7 +719,8 @@ export default function CommandCenterPage() {
           <NodeSheet
             node={selectedNode}
             chokeMultiplier={chokeMultiplier}
-            rainRate={rainMmH > 30 ? 1.0 : rainMmH / 30}
+            rainRate={liveWeatherMode ? (((selectedNode.localWeather as Partial<WeatherData & UserWeatherData>)?.rRate) ?? getRRateFromWeather(Number((selectedNode.localWeather as Partial<WeatherData & UserWeatherData>)?.effectiveRainMmH ?? (selectedNode.localWeather as Partial<WeatherData & UserWeatherData>)?.rainMmH) || 0)) : (rainMmH > 30 ? 1.0 : rainMmH / 30)}
+            liveWeatherMode={liveWeatherMode}
             onClose={() => setSelectedNode(null)}
             onDispatch={(n) => setSmsModalNode(n)}
             dispatching={false}

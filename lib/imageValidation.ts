@@ -2,10 +2,15 @@ export const SCREEN_CONFIDENCE_THRESHOLD = 80;
 export const ROAD_PROTECT_THRESHOLD = 70;
 export const INDOOR_CONFIDENCE_THRESHOLD = 80;
 export const OUTDOOR_MIN_THRESHOLD = 60;
+
 export const ROAD_SCENE_A_THRESHOLD = 60;
-export const OUTDOOR_B_THRESHOLD = 80;
-export const CONTEXT_B_THRESHOLD = 70;
-export const FLOOD_C_THRESHOLD = 70;
+export const OUTDOORS_B_THRESHOLD = 70;
+export const CONTEXT_B_THRESHOLD = 60;
+export const PRIMARY_C_THRESHOLD = 75;
+export const CONTEXT_C_THRESHOLD = 40;
+export const INDOOR_C_MAX_THRESHOLD = 60;
+
+export const BLOCKAGE_THRESHOLD = 70;
 
 export const SCREEN_LABELS: string[] = [
   'monitor',
@@ -50,6 +55,9 @@ export const ROAD_SCENE_LABELS_A: string[] = [
   'alleyway',
   'parking lot',
   'trail',
+  'bridge',
+  'tunnel',
+  'underpass',
 ];
 
 export const OUTDOOR_CONTEXT_LABELS_B: string[] = [
@@ -71,20 +79,71 @@ export const OUTDOOR_CONTEXT_LABELS_B: string[] = [
   'flood',
   'water',
   'ground',
+  'rubble',
+  'debris',
+  'garbage',
+  'trash',
+  'litter',
+  'waste',
+  'rubbish',
+  'plastic',
+  'drain',
+  'sewer',
+  'gutter',
+  'manhole',
+  'culvert',
+  'canal',
+  'nature',
 ];
 
-export const FLOOD_LABELS_C: string[] = [
+export const PRIMARY_BLOCKAGE_WATER_LABELS_C: string[] = [
+  'garbage',
+  'trash',
+  'litter',
+  'waste',
+  'rubbish',
+  'drain',
+  'sewer',
+  'gutter',
+  'manhole',
+  'culvert',
+  'puddle',
   'flood',
   'flash flood',
+  'water',
+];
+
+export const SECONDARY_CONTEXT_LABELS_C: string[] = Array.from(new Set([
+  'outdoors',
+  'ground',
+  'soil',
+  ...ROAD_SCENE_LABELS_A,
+]));
+
+export const BLOCKAGE_LABELS: string[] = [
+  'garbage',
+  'trash',
+  'litter',
+  'waste',
+  'rubbish',
+  'plastic',
+  'drain',
+  'sewer',
+  'gutter',
+  'manhole',
+  'culvert',
+  'debris',
+  'rubble',
 ];
 
 export const ROAD_PROTECT_LABELS: string[] = Array.from(new Set([
   ...ROAD_SCENE_LABELS_A,
   ...OUTDOOR_CONTEXT_LABELS_B,
-  ...FLOOD_LABELS_C,
+  ...PRIMARY_BLOCKAGE_WATER_LABELS_C,
   'outdoors',
 ]));
 
+// Keep ROAD_LABELS export for backwards compatibility
 export const ROAD_LABELS: string[] = ROAD_PROTECT_LABELS;
 
 export interface ValidationLabel {
@@ -99,13 +158,15 @@ export interface RoadValidationResult {
   reason: string;
   roadConfidence: number;
   screenConfidence: number;
+  blockageConfidence: number;
+  blockageDetected: boolean;
 }
 
 export function validateRoadImage(labels: ValidationLabel[] = []): RoadValidationResult {
   const safeLabels = Array.isArray(labels) ? labels : [];
 
   let normalized = safeLabels.map(l => {
-    const name = ((l.name ?? l.Name ?? '') as string).toLowerCase().trim();
+    const name = ((l.name ?? l.Name ?? '') + '').toLowerCase().trim();
     const conf = typeof l.confidence === 'number'
       ? l.confidence
       : typeof l.Confidence === 'number'
@@ -127,43 +188,43 @@ export function validateRoadImage(labels: ValidationLabel[] = []): RoadValidatio
   const roadProtectSet = new Set(ROAD_PROTECT_LABELS);
   const roadSetA = new Set(ROAD_SCENE_LABELS_A);
   const contextSetB = new Set(OUTDOOR_CONTEXT_LABELS_B);
-  const floodSetC = new Set(FLOOD_LABELS_C);
+  const primarySetC = new Set(PRIMARY_BLOCKAGE_WATER_LABELS_C);
+  const secondarySetC = new Set(SECONDARY_CONTEXT_LABELS_C);
+  const blockageSet = new Set(BLOCKAGE_LABELS);
 
   let maxScreenConfidence = 0;
   let maxIndoorConfidence = 0;
   let outdoorsConfidence = 0;
   let maxRoadProtectConfidence = 0;
+  let maxBlockageConfidence = 0;
 
   for (const item of normalized) {
-    if (screenSet.has(item.name)) {
-      if (item.confidence > maxScreenConfidence) {
-        maxScreenConfidence = item.confidence;
-      }
+    if (screenSet.has(item.name) && item.confidence > maxScreenConfidence) {
+      maxScreenConfidence = item.confidence;
     }
-    if (indoorSet.has(item.name)) {
-      if (item.confidence > maxIndoorConfidence) {
-        maxIndoorConfidence = item.confidence;
-      }
+    if (indoorSet.has(item.name) && item.confidence > maxIndoorConfidence) {
+      maxIndoorConfidence = item.confidence;
     }
-    if (item.name === 'outdoors') {
-      if (item.confidence > outdoorsConfidence) {
-        outdoorsConfidence = item.confidence;
-      }
+    if (item.name === 'outdoors' && item.confidence > outdoorsConfidence) {
+      outdoorsConfidence = item.confidence;
     }
-    if (roadProtectSet.has(item.name)) {
-      if (item.confidence > maxRoadProtectConfidence) {
-        maxRoadProtectConfidence = item.confidence;
-      }
+    if (roadProtectSet.has(item.name) && item.confidence > maxRoadProtectConfidence) {
+      maxRoadProtectConfidence = item.confidence;
+    }
+    if (blockageSet.has(item.name) && item.confidence > maxBlockageConfidence) {
+      maxBlockageConfidence = item.confidence;
     }
   }
 
-  // 1. Screen rejection: strong screen labels >= 80 AND no road label >= 70
+  // 1. Screen rejection: strong screen labels >= 80 AND no road/outdoor label >= 70
   if (maxScreenConfidence >= SCREEN_CONFIDENCE_THRESHOLD && maxRoadProtectConfidence < ROAD_PROTECT_THRESHOLD) {
     return {
       valid: false,
       reason: 'This looks like a photo of a screen or device, not a real road. Point the camera at the actual street.',
       roadConfidence: Math.round(maxRoadProtectConfidence),
       screenConfidence: Math.round(maxScreenConfidence),
+      blockageConfidence: Math.round(maxBlockageConfidence),
+      blockageDetected: false,
     };
   }
 
@@ -174,46 +235,52 @@ export function validateRoadImage(labels: ValidationLabel[] = []): RoadValidatio
       reason: 'No road detected. Take a live photo of the road.',
       roadConfidence: Math.round(maxRoadProtectConfidence),
       screenConfidence: Math.round(maxScreenConfidence),
+      blockageConfidence: Math.round(maxBlockageConfidence),
+      blockageDetected: false,
     };
   }
 
-  // 3. ACCEPT as a road scene if ANY of:
-  // a) road, street, asphalt, tarmac, etc >= 60
-  // b) outdoors >= 80 AND context >= 70
-  // c) flood or flash flood >= 70
+  // 3. ACCEPT as valid outdoor scene if ANY of:
+  // (a) road, street, asphalt, tarmac, etc >= 60
+  // (b) outdoors >= 70 AND context >= 60
+  // (c) garbage, drain, puddle, etc >= 75 together with (outdoors/ground/soil/road >= 40 OR without any indoor label >= 60)
   const qualifyingConfidences: number[] = [];
 
+  // Check rule (a)
   for (const item of normalized) {
     if (roadSetA.has(item.name) && item.confidence >= ROAD_SCENE_A_THRESHOLD) {
       qualifyingConfidences.push(item.confidence);
     }
   }
 
-  if (outdoorsConfidence >= OUTDOOR_B_THRESHOLD) {
-    const matchingBConfidences: number[] = [];
-    for (const item of normalized) {
-      if (contextSetB.has(item.name) && item.confidence >= CONTEXT_B_THRESHOLD) {
-        matchingBConfidences.push(item.confidence);
-      }
-    }
-    if (matchingBConfidences.length > 0) {
-      qualifyingConfidences.push(outdoorsConfidence, ...matchingBConfidences);
+  // Check rule (b)
+  if (outdoorsConfidence >= OUTDOORS_B_THRESHOLD) {
+    const matchingB = normalized.filter(item => contextSetB.has(item.name) && item.confidence >= CONTEXT_B_THRESHOLD);
+    if (matchingB.length > 0) {
+      qualifyingConfidences.push(outdoorsConfidence, ...matchingB.map(m => m.confidence));
     }
   }
 
-  for (const item of normalized) {
-    if (floodSetC.has(item.name) && item.confidence >= FLOOD_C_THRESHOLD) {
-      qualifyingConfidences.push(item.confidence);
+  // Check rule (c)
+  const matchingCPrimary = normalized.filter(item => primarySetC.has(item.name) && item.confidence >= PRIMARY_C_THRESHOLD);
+  if (matchingCPrimary.length > 0) {
+    const hasSecondaryContext = normalized.some(item => secondarySetC.has(item.name) && item.confidence >= CONTEXT_C_THRESHOLD);
+    const hasNoIndoorConflict = maxIndoorConfidence < INDOOR_C_MAX_THRESHOLD;
+    if (hasSecondaryContext || hasNoIndoorConflict) {
+      qualifyingConfidences.push(...matchingCPrimary.map(m => m.confidence));
     }
   }
 
   if (qualifyingConfidences.length > 0) {
-    const highestValidConfidence = Math.max(...qualifyingConfidences);
+    const highestValid = Math.max(...qualifyingConfidences);
+    const blockageDetected = maxBlockageConfidence >= BLOCKAGE_THRESHOLD;
     return {
       valid: true,
-      reason: 'Outdoor road scene',
-      roadConfidence: Math.round(highestValidConfidence),
+      reason: blockageDetected ? 'Outdoor scene (blockage detected)' : 'Outdoor road scene',
+      roadConfidence: Math.round(highestValid),
       screenConfidence: Math.round(maxScreenConfidence),
+      blockageConfidence: Math.round(maxBlockageConfidence),
+      blockageDetected,
     };
   }
 
@@ -222,5 +289,7 @@ export function validateRoadImage(labels: ValidationLabel[] = []): RoadValidatio
     reason: 'No road detected. Take a live photo of the road.',
     roadConfidence: Math.round(maxRoadProtectConfidence),
     screenConfidence: Math.round(maxScreenConfidence),
+    blockageConfidence: Math.round(maxBlockageConfidence),
+    blockageDetected: false,
   };
 }
