@@ -1,0 +1,12 @@
+{
+  "cli": { "version": ">= 9.0.0" },
+  "build": {
+    "preview": { 
+      "distribution": "internal", 
+      "android": { "buildType": "apk" },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://main.d8ovyga5ca3ks.amplifyapp.com"
+      }
+    }
+  }
+}
