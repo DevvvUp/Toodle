@@ -1,4 +1,4 @@
-# Toodle (formerly FloodGuard AI)
+# Toodle
 
 <p align="center">
   <img src="public/brand/toodle-logo-teal.png" alt="Toodle Logo" width="120" />
@@ -12,6 +12,7 @@
 <p align="center">
   <a href="https://main.d8ovyga5ca3ks.amplifyapp.com"><img src="https://img.shields.io/badge/Production-Live%20on%20AWS%20Amplify-00D2D3?style=for-the-badge&logo=amazonaws" alt="AWS Amplify"></a>
   <a href="https://expo.dev/artifacts/eas/QztcYs3Ddv6gBmXzEPBF2TFx_zAp-RYtk9gkvSVVUHA.apk"><img src="https://img.shields.io/badge/Android%20APK-v1.0.0%20Download-3DDC84?style=for-the-badge&logo=android" alt="Android APK"></a>
+  <a href="#14-ios-application-on-its-way--testflight-beta"><img src="https://img.shields.io/badge/iOS%20App-On%20Its%20Way-007AFF?style=for-the-badge&logo=apple" alt="iOS App On Its Way"></a>
   <a href="https://github.com/Rudraksh2996/Toodle"><img src="https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github" alt="GitHub"></a>
   <a href="https://github.com/Rudraksh2996/Toodle/blob/main/Toodle_Idea_Presentation.pptx"><img src="https://img.shields.io/badge/Pitch%20Deck-16%3A9%20PPTX-FF4B4B?style=for-the-badge&logo=microsoftpowerpoint" alt="PPTX Deck"></a>
 </p>
@@ -38,10 +39,11 @@
 11. [AWS Provisioning & IAM Security](#11-aws-provisioning--iam-security)
 12. [AWS Amplify Production Deployment](#12-aws-amplify-production-deployment)
 13. [Building the Standalone Android APK (EAS Build)](#13-building-the-standalone-android-apk-eas-build)
-14. [Performance Benchmarks & Unit Economics](#14-performance-benchmarks--unit-economics)
-15. [Repository Directory Layout](#15-repository-directory-layout)
-16. [Presentation & Documentation Artifacts](#16-presentation--documentation-artifacts)
-17. [License & Acknowledgments](#17-license--acknowledgments)
+14. [iOS Application (On Its Way / TestFlight Beta)](#14-ios-application-on-its-way--testflight-beta)
+15. [Performance Benchmarks & Unit Economics](#15-performance-benchmarks--unit-economics)
+16. [Repository Directory Layout](#16-repository-directory-layout)
+17. [Presentation & Documentation Artifacts](#17-presentation--documentation-artifacts)
+18. [License & Acknowledgments](#18-license--acknowledgments)
 
 ---
 
@@ -655,7 +657,32 @@ The Android application is packaged via **Expo Application Services (EAS)**:
 
 ---
 
-## 14. Performance Benchmarks & Unit Economics
+## 14. iOS Application (On Its Way / TestFlight Beta)
+
+<p align="center">
+  <img src="https://img.shields.io/badge/iOS%20Build-On%20Its%20Way-007AFF?style=for-the-badge&logo=apple" alt="iOS On Its Way" />
+  <img src="https://img.shields.io/badge/Apple%20TestFlight-Private%20Beta-007AFF?style=for-the-badge&logo=testflight" alt="TestFlight Beta" />
+</p>
+
+Toodle's mobile ecosystem is built on a unified **React Native + Expo Router** architecture. While the standalone Android APK is live and installable today, the native **iOS build for iPhone & iPad is currently on its way**:
+
+### What to Expect on iOS
+* **Unified Parity**: Identical real-time Command Center, 12 Delhi NCR monitoring nodes, 4-stage storm simulator, and 60-minute FRI line charts.
+* **Apple CoreLocation & AVFoundation**: High-accuracy GPS verification and low-latency native camera viewfinder for Rekognition field scanning.
+* **Native iOS Haptics**: Tactile feedback on simulator preset changes and emergency SMS dispatch events via `expo-haptics`.
+* **TestFlight Private Beta**: An internal TestFlight beta build is currently being staged via EAS Build (`eas build -p ios --profile preview`).
+
+### Building for iOS (For Registered Apple Developers)
+```bash
+cd floodguard-mobile
+
+# Trigger EAS cloud build for iOS
+npx eas-cli build -p ios --profile preview
+```
+
+---
+
+## 15. Performance Benchmarks & Unit Economics
 
 ### Empirical Benchmarks
 
@@ -679,7 +706,7 @@ The Android application is packaged via **Expo Application Services (EAS)**:
 
 ---
 
-## 15. Repository Directory Layout
+## 16. Repository Directory Layout
 
 ```
 Toodle/
@@ -723,7 +750,7 @@ Toodle/
 
 ---
 
-## 16. Presentation & Documentation Artifacts
+## 17. Presentation & Documentation Artifacts
 
 * **PowerPoint Presentation Deck**: [`Toodle_Idea_Presentation.pptx`](file:///C:/Users/shiva/Documents/floodguard-ai/Toodle_Idea_Presentation.pptx)  
   *12-slide executive pitch deck with dark-mode aesthetic, mathematical callouts, and embedded high-resolution screenshots.*
@@ -734,7 +761,7 @@ Toodle/
 
 ---
 
-## 17. License & Acknowledgments
+## 18. License & Acknowledgments
 
 Created by **Rudraksh Sharma** for the **DTU Environmental Hacks (Heat & Water Track)**.
 
