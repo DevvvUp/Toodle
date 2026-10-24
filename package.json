@@ -14,6 +14,7 @@
     "@aws-sdk/client-sns": "^3.1148.0",
     "@aws-sdk/client-sts": "^3.1149.0",
     "@aws-sdk/lib-dynamodb": "^3.1148.0",
+    "@clerk/backend": "^3.26.2",
     "@types/leaflet": "^1.9.22",
     "clsx": "^2.1.1",
     "dotenv": "^18.0.6",

@@ -5,7 +5,7 @@ frontend:
       commands: [nvm use 20, npm ci]
     build:
       commands:
-        - env | grep -e SNS_TOPIC_ARN -e DDB_TABLE -e APP_AWS_REGION -e APP_ACCESS_KEY_ID -e APP_SECRET_ACCESS_KEY >> .env.production
+        - env | grep -e SNS_TOPIC_ARN -e DDB_TABLE -e APP_AWS_REGION -e APP_ACCESS_KEY_ID -e APP_SECRET_ACCESS_KEY -e CLERK_SECRET_KEY -e TEST_ALERT_ALLOWED_USER_IDS >> .env.production
         - npm run build
   artifacts: { baseDirectory: .next, files: ['**/*'] }
   cache: { paths: [node_modules/**/*, .next/cache/**/*] }
