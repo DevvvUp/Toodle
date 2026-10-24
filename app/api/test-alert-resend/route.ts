@@ -8,11 +8,13 @@ import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { getDynamoDbClient, getSnsClient } from "@/lib/aws-config";
 
 export async function POST(req: Request) {
-  const secretKey = process.env.CLERK_SECRET_KEY?.trim();
+  const jwtKey = process.env.CLERK_JWT_KEY_B64
+    ? Buffer.from(process.env.CLERK_JWT_KEY_B64, "base64").toString("utf8")
+    : "";
   const topicArn = process.env.SNS_TOPIC_ARN?.trim();
   const tableName = process.env.DDB_TABLE?.trim();
   const allowed = new Set((process.env.TEST_ALERT_ALLOWED_USER_IDS ?? "").split(",").map(value => value.trim()).filter(Boolean));
-  if (!secretKey || !topicArn || !tableName || allowed.size === 0) {
+  if (!jwtKey || !topicArn || !tableName || allowed.size === 0) {
     return NextResponse.json({ error: "Test alert resend is not configured" }, { status: 503 });
   }
 
@@ -20,7 +22,7 @@ export async function POST(req: Request) {
   if (!bearer) return NextResponse.json({ error: "Sign in is required" }, { status: 401 });
   let userId: string;
   try {
-    const token = await verifyToken(bearer, { secretKey });
+    const token = await verifyToken(bearer, { jwtKey });
     userId = token.sub;
   } catch {
     return NextResponse.json({ error: "Session could not be verified" }, { status: 401 });
