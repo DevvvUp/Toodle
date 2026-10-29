@@ -4,19 +4,56 @@
 
 @layer base {
   :root {
-    --background: 0 0% 3.5%;
+    --background: 212 60% 4%;
     --foreground: 0 0% 100%;
+
+    /* Blue holographic foil palette (no purple / magenta; cyan-green is the limit) */
+    --canvas: #050a12;
+    --canvas-deep: #03070d;
+    --foil-900: #071a2e;
+    --foil-700: #0b3356;
+    --foil-500: #10598f;
+    --foil-300: #2a9ad6;
+    --foil-200: #4fc8ea;
+    --foil-100: #86e6dd;      /* maximum tilt toward green */
+    --accent: #3aa9ff;
+    --accent-ink: #04121f;
+
+    --ink: #ffffff;
+    --ink-muted: #a9c4dc;     /* 7.4:1 on glass */
+    --ink-faint: #8aa8c2;     /* 5.1:1 on glass */
+
+    --glass-bg: rgba(10, 29, 50, 0.56);
+    --glass-bg-strong: rgba(8, 24, 42, 0.78);
+    --glass-border: rgba(124, 196, 255, 0.22);
+    --glass-highlight: rgba(170, 230, 255, 0.10);
+
+    /* Risk tiers stay red / amber / green — always paired with an icon + label */
+    --risk-critical: #ef4444;
+    --risk-critical-ink: #ffb4b4;
+    --risk-warning: #f59e0b;
+    --risk-warning-ink: #ffd27a;
+    --risk-normal: #22c55e;
+    --risk-normal-ink: #86efac;
+
+    /* Spacing + radius scale from design.md */
+    --sp-xxs: 4px;  --sp-xs: 8px;  --sp-sm: 12px; --sp-md: 17px;
+    --sp-lg: 24px;  --sp-xl: 32px; --sp-xxl: 48px; --sp-section: 80px;
   }
 }
 
 html {
   scroll-behavior: smooth;
-  background-color: #090909;
+  background-color: var(--canvas-deep);
 }
 
 body {
-  color: #ffffff;
-  background: #090909;
+  /* Families from design.md; system-ui resolves to Roboto on Android, Inter is the web fallback */
+  --font-display: "SF Pro Display", system-ui, -apple-system, var(--font-inter), sans-serif;
+  --font-text: "SF Pro Text", system-ui, -apple-system, var(--font-inter), sans-serif;
+  font-family: var(--font-text);
+  color: var(--ink);
+  background: var(--canvas-deep);
   font-feature-settings: "cv11" 1, "ss01" 1;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -28,10 +65,153 @@ html, body {
 }
 
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
+  .text-balance { text-wrap: balance; }
+
+  /* Typography scale — families, sizes, line-heights and tracking from design.md */
+  .t-hero      { font-family: var(--font-display); font-size: 56px; font-weight: 600; line-height: 1.07; letter-spacing: -0.28px; }
+  .t-display   { font-family: var(--font-display); font-size: 40px; font-weight: 600; line-height: 1.10; letter-spacing: 0; }
+  .t-display-sm{ font-family: var(--font-text);    font-size: 34px; font-weight: 600; line-height: 1.47; letter-spacing: -0.374px; }
+  .t-lead      { font-family: var(--font-display); font-size: 28px; font-weight: 400; line-height: 1.14; letter-spacing: 0.196px; }
+  .t-lead-airy { font-family: var(--font-text);    font-size: 24px; font-weight: 300; line-height: 1.50; letter-spacing: 0; }
+  .t-tagline   { font-family: var(--font-display); font-size: 21px; font-weight: 600; line-height: 1.19; letter-spacing: 0.231px; }
+  .t-body      { font-family: var(--font-text);    font-size: 17px; font-weight: 400; line-height: 1.47; letter-spacing: -0.374px; }
+  .t-body-strong{font-family: var(--font-text);    font-size: 17px; font-weight: 600; line-height: 1.24; letter-spacing: -0.374px; }
+  .t-caption   { font-family: var(--font-text);    font-size: 14px; font-weight: 400; line-height: 1.43; letter-spacing: -0.224px; }
+  .t-caption-strong { font-family: var(--font-text); font-size: 14px; font-weight: 600; line-height: 1.29; letter-spacing: -0.224px; }
+  .t-fine      { font-family: var(--font-text);    font-size: 12px; font-weight: 400; line-height: 1.33; letter-spacing: -0.12px; }
+  .t-micro     { font-family: var(--font-text);    font-size: 10px; font-weight: 400; line-height: 1.30; letter-spacing: -0.08px; }
+
+  .pt-safe { padding-top: env(safe-area-inset-top); }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+  .pl-safe { padding-left: env(safe-area-inset-left); }
+  .pr-safe { padding-right: env(safe-area-inset-right); }
+}
+
+@layer components {
+  /* Glass: translucent layer, blur, hairline border, faint foil gradient */
+  .glass {
+    position: relative;
+    background:
+      linear-gradient(135deg, var(--glass-highlight) 0%, transparent 38%, transparent 62%, rgba(58, 169, 255, 0.07) 100%),
+      var(--glass-bg);
+    backdrop-filter: blur(18px) saturate(150%);
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    border: 1px solid var(--glass-border);
+  }
+  .glass-strong {
+    background:
+      linear-gradient(135deg, var(--glass-highlight) 0%, transparent 42%, rgba(58, 169, 255, 0.08) 100%),
+      var(--glass-bg-strong);
+    backdrop-filter: blur(24px) saturate(150%);
+    -webkit-backdrop-filter: blur(24px) saturate(150%);
+    border: 1px solid var(--glass-border);
+  }
+  /* Foil edge: a hairline that shifts hue across blue -> cyan */
+  .foil-edge {
+    border-image: linear-gradient(120deg, rgba(58,169,255,.5), rgba(134,230,221,.45), rgba(16,89,143,.4)) 1;
   }
 }
+
+/* ---------- Dynamic effects ---------- */
+
+/* Liquid morph: shape change only, never position — content must not move. */
+@keyframes fx-morph-a {
+  0%, 100% { border-radius: 58% 42% 37% 63% / 46% 58% 42% 54%; transform: scale(1); }
+  33%      { border-radius: 38% 62% 58% 42% / 62% 38% 62% 38%; transform: scale(1.06); }
+  66%      { border-radius: 63% 37% 45% 55% / 38% 56% 44% 62%; transform: scale(0.96); }
+}
+@keyframes fx-morph-b {
+  0%, 100% { border-radius: 42% 58% 62% 38% / 55% 44% 56% 45%; transform: scale(1.02); }
+  40%      { border-radius: 65% 35% 40% 60% / 40% 62% 38% 60%; transform: scale(0.94); }
+  70%      { border-radius: 36% 64% 55% 45% / 58% 40% 60% 42%; transform: scale(1.05); }
+}
+@keyframes fx-bubble {
+  0%   { transform: translate3d(0, 10vh, 0) scale(0.7); opacity: 0; }
+  12%  { opacity: 0.5; }
+  88%  { opacity: 0.35; }
+  100% { transform: translate3d(0, -92vh, 0) scale(1.15); opacity: 0; }
+}
+
+/* Topographic stream: contours sweep in left -> right, cover, then clear left -> right. */
+@keyframes fx-stream-sweep {
+  0%   { clip-path: inset(0 100% 0 0); }
+  42%  { clip-path: inset(0 0 0 0); }
+  56%  { clip-path: inset(0 0 0 0); }
+  100% { clip-path: inset(0 0 0 100%); }
+}
+@keyframes fx-stream-shimmer {
+  0%   { transform: translate3d(-40%, 0, 0); }
+  100% { transform: translate3d(140%, 0, 0); }
+}
+@keyframes fx-contour-drift {
+  0%   { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(-6%, 0, 0); }
+}
+@keyframes fx-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.fx-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.fx-blob {
+  position: absolute;
+  filter: blur(60px);
+  opacity: 0.62;
+  will-change: border-radius, transform;
+}
+
+.fx-bubble {
+  position: absolute;
+  bottom: -12vh;
+  border-radius: 9999px;
+  background: radial-gradient(circle at 32% 28%, rgba(180, 238, 255, 0.55), rgba(58, 169, 255, 0.12) 62%, transparent 72%);
+  border: 1px solid rgba(150, 220, 255, 0.22);
+  will-change: transform, opacity;
+}
+
+.fx-stream {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  animation: fx-stream-sweep 980ms cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+.fx-stream-contours { position: absolute; inset: -2% -8% -2% -8%; width: 116%; opacity: 0.85; animation: fx-contour-drift 980ms linear forwards; }
+/* Volumetric depth */
+.fx-stream-depth {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(120% 70% at 20% 50%, rgba(8, 36, 64, 0.72), rgba(4, 12, 22, 0.90) 70%),
+    linear-gradient(90deg, rgba(5, 14, 26, 0.95), rgba(7, 26, 46, 0.80) 45%, rgba(5, 14, 26, 0.95));
+}
+/* Diffraction-grating shimmer, kept inside the blue -> cyan band */
+.fx-stream-grating {
+  position: absolute; inset: -10% -45% -10% -45%;
+  background: repeating-linear-gradient(
+    102deg,
+    rgba(58, 169, 255, 0.00) 0px,
+    rgba(58, 169, 255, 0.16) 2px,
+    rgba(134, 230, 221, 0.20) 4px,
+    rgba(42, 154, 214, 0.10) 7px,
+    rgba(58, 169, 255, 0.00) 11px
+  );
+  mix-blend-mode: screen;
+  opacity: 0.55;
+  animation: fx-stream-shimmer 980ms ease-out forwards;
+}
+
+/* Pause every effect while the tab is hidden */
+.fx-paused .fx-blob,
+.fx-paused .fx-bubble,
+.fx-paused .fx-stream,
+.fx-paused .fx-stream-contours,
+.fx-paused .fx-stream-grating { animation-play-state: paused !important; }
 
 /* Map tiles: dark filter on tile pane only */
 .dark-map-tiles .leaflet-tile-pane {
@@ -47,25 +227,13 @@ html, body {
 
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #262626 transparent;
+  scrollbar-color: rgba(124, 196, 255, 0.25) transparent;
 }
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
+.custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: #262626;
+  background-color: rgba(124, 196, 255, 0.25);
   border-radius: 10px;
-}
-
-@layer utilities {
-  .pt-safe { padding-top: env(safe-area-inset-top); }
-  .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
-  .pl-safe { padding-left: env(safe-area-inset-left); }
-  .pr-safe { padding-right: env(safe-area-inset-right); }
 }
 
 /* Touch tap target minimums on touch-enabled devices */
@@ -76,7 +244,7 @@ html, body {
   }
 }
 
-/* Reduced motion preference respect */
+/* Reduced motion: no morph, no stream — a plain fade only */
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after {
     animation-duration: 0.01ms !important;
@@ -84,4 +252,8 @@ html, body {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+  .fx-blob, .fx-bubble { animation: none !important; }
+  .fx-bubble { display: none; }
+  .fx-stream { display: none; }
+  .fx-fade { animation: fx-fade-in 160ms ease-out both !important; }
 }

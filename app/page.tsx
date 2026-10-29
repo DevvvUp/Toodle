@@ -12,11 +12,11 @@ export default function HomePage() {
   ];
 
   return (
-    <div className="min-h-[100dvh] bg-[#090909] text-white flex flex-col items-center justify-center p-3 sm:p-4 overflow-x-clip">
-      <div className="w-full max-w-[480px] sm:max-w-[600px] lg:max-w-[720px] min-h-[100dvh] bg-[#090909] flex flex-col items-center justify-center px-4 sm:px-8 py-10 relative border-x border-[#262626]/40 shadow-2xl">
-        
+    <div className="fx-fade min-h-[100dvh] flex flex-col items-center justify-center px-md py-xl pt-safe pb-safe overflow-x-clip">
+      <div className="w-full max-w-[480px] sm:max-w-[600px] lg:max-w-[720px] flex flex-col items-center justify-center">
+
         {/* Logo */}
-        <div className="w-16 h-16 relative mb-6">
+        <div className="w-16 h-16 relative mb-lg">
           <Image
             src="/brand/toodle-logo-white.png"
             alt="Toodle Logo"
@@ -27,49 +27,45 @@ export default function HomePage() {
           />
         </div>
 
-        {/* Title & Tagline with Fluid Scaling */}
-        <h1 className="text-[clamp(28px,5vw,36px)] font-semibold text-white tracking-[-1px] text-center mb-2">
-          Toodle
-        </h1>
-        <p className="text-[clamp(15px,2.5vw,18px)] text-[#999999] tracking-[-0.18px] text-center mb-8 sm:mb-10 max-w-[360px]">
+        {/* Title & tagline */}
+        <h1 className="t-hero text-center text-white mb-xs">Toodle</h1>
+        <p className="t-body sm:t-lead-airy text-center text-inkMuted mb-xl max-w-[360px]">
           Predict floods before the street submerges.
         </p>
 
-        {/* 2x2 Metric Cards */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 w-full mb-8 sm:mb-10 max-w-[560px]">
-          {stats.map((s, i) => (
+        {/* 2x2 metric cards */}
+        <div className="grid grid-cols-2 gap-sm sm:gap-md w-full mb-xl max-w-[560px]">
+          {stats.map((s) => (
             <div
-              key={i}
-              className="bg-[#141414] border border-[#262626] rounded-[20px] p-3.5 sm:p-4 flex flex-col items-center justify-center text-center"
+              key={s.label}
+              className="glass rounded-lg px-sm py-md flex flex-col items-center justify-center text-center"
             >
-              <span className="font-mono font-bold text-[16px] sm:text-[18px] text-white tracking-tight tabular-nums">
+              <span className="font-mono font-semibold text-[17px] leading-[1.24] tracking-[-0.374px] text-white tabular-nums">
                 {s.value}
               </span>
-              <span className="text-[11px] sm:text-[12px] font-medium text-[#999999] tracking-[-0.12px] mt-1">
+              <span className="t-caption-strong text-inkMuted mt-xxs">
                 {s.label}
               </span>
-              <span className="text-[10px] text-[#666666] tracking-[-0.1px] mt-0.5">
-                {s.sub}
-              </span>
+              <span className="t-micro text-inkFaint mt-xxs">{s.sub}</span>
             </div>
           ))}
         </div>
 
-        {/* Action Button */}
+        {/* Primary action */}
         <Link
           href="/command-center"
-          className="w-full max-w-[560px] bg-white text-black font-bold text-[16px] sm:text-[17px] tracking-[-0.5px] rounded-full py-4 text-center hover:bg-neutral-200 transition-colors shadow-lg active:scale-[0.98] min-h-[48px] flex items-center justify-center mb-5"
+          className="w-full max-w-[560px] rounded-pill min-h-[52px] px-xl flex items-center justify-center text-center text-accentInk font-semibold text-[18px] leading-none border border-foil-100/50 bg-gradient-to-r from-accent via-foil-200 to-foil-100 hover:brightness-110 transition-[filter] active:scale-[0.99] mb-sm"
         >
           Launch Command Center
         </Link>
 
-        {/* Architecture Link */}
+        {/* Secondary action */}
         <Link
           href="/about"
-          className="text-[13px] text-[#999999] hover:text-white transition-colors inline-flex items-center gap-1.5 min-h-[44px] py-2"
+          className="t-caption text-inkMuted hover:text-white transition-colors inline-flex items-center gap-xs min-h-[44px] px-sm"
         >
           Learn about our architecture
-          <ArrowRight className="w-3.5 h-3.5" />
+          <ArrowRight className="w-4 h-4" aria-hidden="true" />
         </Link>
       </div>
     </div>

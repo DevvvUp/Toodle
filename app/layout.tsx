@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Fira_Code } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "sonner";
+import { FxLayer } from "@/components/fx/fx-layer";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -19,7 +20,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#090909",
+  themeColor: "#050a12",
 };
 
 export const metadata: Metadata = {
@@ -51,8 +52,9 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body
-        className={`${inter.variable} ${firaCode.variable} font-sans antialiased bg-[#090909] text-white selection:bg-[#0099ff]/30 selection:text-white`}
+        className={`${inter.variable} ${firaCode.variable} font-sans antialiased bg-canvasDeep text-white selection:bg-accent/30 selection:text-white`}
       >
+        <FxLayer />
         {children}
         <Toaster theme="dark" position="bottom-right" />
       </body>
